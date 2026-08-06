@@ -29,11 +29,9 @@ function ProtectedRoute({ children }) {
     }
   }, [token, navigate]);
 
-  if (!token) {
-    return null;
-  }
   if (
     !isOnboarded && 
+    !whitelistPaths.includes(window.location.pathname) &&
     !onboardingPaths.includes(window.location.pathname) 
   ) {
     navigate("/onboarding/step-1", { replace: true });

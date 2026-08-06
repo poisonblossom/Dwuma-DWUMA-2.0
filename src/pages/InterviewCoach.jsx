@@ -1,801 +1,299 @@
-import { useEffect, useRef, useState } from "react";
-import { useLocation } from "wouter";
+import { useEffect, useMemo, useState } from "react";
 import {
-  Bell,
+  ArrowLeft,
+  ArrowRight,
   BriefcaseBusiness,
-  FileText,
-  LayoutDashboard,
-  Menu,
-  Mic,
+  CheckCircle2,
+  ChevronRight,
+  CircleAlert,
+  Lightbulb,
+  LoaderCircle,
+  MessageSquareText,
   RotateCcw,
-  Search,
-  Send,
-  Settings,
-  UserRound,
-  UsersRound,
+  Sparkles,
+  Target,
+  Trophy,
 } from "lucide-react";
 
-import logo from "../assets/logo.svg";
+import DashboardLayout from "../Components/dashboard/DashboardLayout";
+import {
+  evaluateInterviewAnswer,
+  generateInterviewQuestions,
+} from "../Components/services/interviewService";
+import "../Components/dashboard/Dashboard.css";
 import "./InterviewCoach.css";
 
-const MAX_ANSWER_LENGTH = 2000;
-const MIN_ANSWER_WORDS = 3;
+const SESSION_KEY = "dwumaInterviewSession";
+const MAX_ANSWER_LENGTH = 4000;
 
-const ALLOWED_INTERVIEW_ROLES = [
-  "Software Developer",
-  "Frontend Developer",
-  "Backend Developer",
-  "Full Stack Developer",
-  "Mobile App Developer",
-  "Data Analyst",
-  "Data Scientist",
-  "Cybersecurity Analyst",
-  "Cloud Engineer",
-  "Network Engineer",
-  "UI/UX Designer",
-  "Product Manager",
-  "Project Manager",
-  "Business Analyst",
-  "Digital Marketer",
-  "Graphic Designer",
-  "Accountant",
-  "Financial Analyst",
-  "Human Resource Officer",
-  "Customer Service Representative",
-  "Sales Representative",
-  "Administrative Assistant",
-  "Civil Engineer",
-  "Electrical Engineer",
-  "Mechanical Engineer",
-  "Graduate Trainee",
-];
+const EMPTY_SETUP = {
+  jobTitle: "",
+  companyName: "",
+  jobDescription: "",
+  candidateSkills: "",
+  candidateExperience: "",
+  numberOfQuestions: 5,
+};
 
-const BLOCKED_CODE_PATTERNS = [
-  /<\s*script\b/i,
-  /<\s*iframe\b/i,
-  /<\s*object\b/i,
-  /<\s*embed\b/i,
-  /<\s*svg\b/i,
-  /javascript\s*:/i,
-  /vbscript\s*:/i,
-  /data\s*:\s*text\/html/i,
-  /\bon\w+\s*=/i,
-  /\beval\s*\(/i,
-  /\bnew\s+Function\s*\(/i,
-  /\bdocument\s*\.\s*(cookie|write)/i,
-  /\bwindow\s*\.\s*location/i,
-];
-
-const BLOCKED_PROMPT_PATTERNS = [
-  /ignore\s+(all\s+)?(previous|prior|above)\s+instructions/i,
-  /disregard\s+(all\s+)?(previous|prior|above)\s+instructions/i,
-  /override\s+(the\s+)?(system|developer)\s+instructions/i,
-  /reveal\s+(your\s+)?(system|hidden|developer)\s+prompt/i,
-  /show\s+(me\s+)?(your\s+)?(system|hidden|developer)\s+instructions/i,
-  /print\s+(your\s+)?(system|hidden|developer)\s+prompt/i,
-  /act\s+as\s+(the\s+)?system/i,
-];
-
-function createMessage(sender, text) {
-  return {
-    id:
-      typeof crypto !== "undefined" &&
-      typeof crypto.randomUUID === "function"
-        ? crypto.randomUUID()
-        : `${Date.now()}-${Math.random()}`,
-    sender,
-    text,
-  };
-}
-
-function normaliseInput(value) {
-  return value
-    .normalize("NFKC")
-    .replace(/\u0000/g, "")
-    .replace(
-      /[\u0001-\u0008\u000B\u000C\u000E-\u001F\u007F]/g,
-      ""
-    )
-    .replace(/\r\n?/g, "\n")
-    .replace(/[ \t]+/g, " ")
-    .trim();
-}
-
-function containsBlockedCode(value) {
-  return BLOCKED_CODE_PATTERNS.some((pattern) =>
-    pattern.test(value)
-  );
-}
-
-function containsPromptInjection(value) {
-  return BLOCKED_PROMPT_PATTERNS.some((pattern) =>
-    pattern.test(value)
-  );
-}
-
-function containsUrl(value) {
-  return /(https?:\/\/|www\.|[a-z0-9-]+\.(com|net|org|io|dev|xyz)\b)/i.test(
-    value
-  );
-}
-
-function isNumbersOnly(value) {
-  return /^[\d\s.,+\-*/=()]+$/.test(value);
-}
-
-function hasEnoughLetters(value) {
-  const letters = value.match(/[a-z]/gi) || [];
-  const visibleCharacters = value.replace(/\s/g, "");
-
-  if (!visibleCharacters.length) {
-    return false;
-  }
-
-  return letters.length / visibleCharacters.length >= 0.5;
-}
-
-function hasRepeatedCharacters(value) {
-  return /(.)\1{5,}/i.test(value);
-}
-
-function hasRepeatedWords(value) {
-  const words = value
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(Boolean);
-
-  if (words.length < 4) {
-    return false;
-  }
-
-  const uniqueWords = new Set(words);
-
-  return uniqueWords.size / words.length < 0.35;
-}
-
-function looksLikeGibberish(value) {
-  const words = value
-    .toLowerCase()
-    .split(/\s+/)
-    .filter(Boolean);
-
-  if (!words.length) {
-    return true;
-  }
-
-  const suspiciousWords = words.filter((word) => {
-    const lettersOnly = word.replace(/[^a-z]/gi, "");
-
-    if (lettersOnly.length < 5) {
-      return false;
+function restoreSession() {
+  try {
+    const value = JSON.parse(sessionStorage.getItem(SESSION_KEY));
+    if (value?.setup && Array.isArray(value.questions) && value.questions.length) {
+      return value;
     }
-
-    const hasVowel = /[aeiou]/i.test(lettersOnly);
-    const longConsonantSequence =
-      /[bcdfghjklmnpqrstvwxyz]{6,}/i.test(
-        lettersOnly
-      );
-
-    return !hasVowel || longConsonantSequence;
-  });
-
-  return suspiciousWords.length / words.length > 0.5;
+  } catch {
+    sessionStorage.removeItem(SESSION_KEY);
+  }
+  return null;
 }
 
-function validateRole(role) {
-  const cleanedRole = normaliseInput(role);
-
-  if (!cleanedRole) {
-    return {
-      isValid: false,
-      error: "Please select an interview role.",
-    };
-  }
-
-  if (!ALLOWED_INTERVIEW_ROLES.includes(cleanedRole)) {
-    return {
-      isValid: false,
-      error: "Please select a role from the available list.",
-    };
-  }
-
-  return {
-    isValid: true,
-    value: cleanedRole,
-    error: "",
-  };
+function persistSession(session) {
+  if (session) sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
+  else sessionStorage.removeItem(SESSION_KEY);
 }
 
-function validateInterviewAnswer(value) {
-  const cleanedValue = normaliseInput(value);
-
-  if (!cleanedValue) {
-    return {
-      isValid: false,
-      error: "Please enter an interview answer.",
-    };
-  }
-
-  if (cleanedValue.length > MAX_ANSWER_LENGTH) {
-    return {
-      isValid: false,
-      error: `Your answer must not exceed ${MAX_ANSWER_LENGTH} characters.`,
-    };
-  }
-
-  if (containsBlockedCode(cleanedValue)) {
-    return {
-      isValid: false,
-      error:
-        "Code, scripts and executable markup are not accepted.",
-    };
-  }
-
-  if (containsPromptInjection(cleanedValue)) {
-    return {
-      isValid: false,
-      error:
-        "System instructions and prompt override requests are not accepted.",
-    };
-  }
-
-  if (containsUrl(cleanedValue)) {
-    return {
-      isValid: false,
-      error: "Links are not accepted in interview answers.",
-    };
-  }
-
-  if (isNumbersOnly(cleanedValue)) {
-    return {
-      isValid: false,
-      error: "Your answer must contain meaningful words.",
-    };
-  }
-
-  if (!hasEnoughLetters(cleanedValue)) {
-    return {
-      isValid: false,
-      error: "Please enter a meaningful written answer.",
-    };
-  }
-
-  if (
-    hasRepeatedCharacters(cleanedValue) ||
-    hasRepeatedWords(cleanedValue) ||
-    looksLikeGibberish(cleanedValue)
-  ) {
-    return {
-      isValid: false,
-      error:
-        "Your answer appears to contain random or repeated text.",
-    };
-  }
-
-  const words = cleanedValue
-    .split(/\s+/)
-    .filter(Boolean);
-
-  if (words.length < MIN_ANSWER_WORDS) {
-    return {
-      isValid: false,
-      error: `Please provide at least ${MIN_ANSWER_WORDS} words.`,
-    };
-  }
-
-  return {
-    isValid: true,
-    value: cleanedValue,
-    error: "",
-  };
+function ScoreRing({ score, label = "Answer score" }) {
+  const safeScore = Math.max(0, Math.min(100, Number(score) || 0));
+  return (
+    <div className="coach-score-ring" style={{ "--score": `${safeScore * 3.6}deg` }}>
+      <div><strong>{safeScore}</strong><span>{label}</span></div>
+    </div>
+  );
 }
 
 function InterviewCoach() {
-  const [, navigate] = useLocation();
-  const chatEndRef = useRef(null);
+  const restored = useMemo(() => restoreSession(), []);
+  const restoredReviewedAnswer =
+    restored?.answers?.[restored.currentIndex];
+  const [setup, setSetup] = useState(restored?.setup || EMPTY_SETUP);
+  const [questions, setQuestions] = useState(restored?.questions || []);
+  const [answers, setAnswers] = useState(restored?.answers || []);
+  const [currentIndex, setCurrentIndex] = useState(restored?.currentIndex || 0);
+  const [answer, setAnswer] = useState(
+    restored?.draftAnswer || restoredReviewedAnswer?.answer || ""
+  );
+  const [feedback, setFeedback] = useState(
+    restored?.feedback || restoredReviewedAnswer?.feedback || null
+  );
+  const [phase, setPhase] = useState(
+    restored?.phase === "complete"
+      ? "complete"
+      : restored
+        ? "interview"
+        : "setup"
+  );
+  const [loading, setLoading] = useState(false);
+  const [error, setError] = useState("");
 
-  const [selectedRole, setSelectedRole] =
-    useState("");
-  const [message, setMessage] = useState("");
-  const [inputError, setInputError] = useState("");
-  const [menuOpen, setMenuOpen] = useState(false);
-  const [interviewStarted, setInterviewStarted] =
-    useState(false);
-  const [isCoachTyping, setIsCoachTyping] =
-    useState(false);
-  const [conversation, setConversation] = useState([]);
+  const currentQuestion = questions[currentIndex];
+  const completedCount = answers.length;
+  const averageScore = completedCount
+    ? Math.round(answers.reduce((sum, item) => sum + Number(item.feedback.score || 0), 0) / completedCount)
+    : 0;
 
   useEffect(() => {
-    if (!interviewStarted) {
-      return;
-    }
-
-    chatEndRef.current?.scrollIntoView({
-      behavior: "smooth",
-      block: "end",
+    if (!questions.length || phase === "setup") return;
+    persistSession({
+      setup,
+      questions,
+      answers,
+      currentIndex,
+      draftAnswer: answer,
+      feedback,
+      phase,
     });
-  }, [conversation, isCoachTyping, interviewStarted]);
+  }, [setup, questions, answers, currentIndex, answer, feedback, phase]);
 
-  function closeMenu() {
-    setMenuOpen(false);
+  function updateSetup(event) {
+    const { name, value } = event.target;
+    setSetup((current) => ({
+      ...current,
+      [name]: name === "numberOfQuestions" ? Number(value) : value,
+    }));
+    setError("");
   }
 
-  function goToPage(path) {
-    closeMenu();
-    navigate(path);
-  }
-
-  function handleRoleChange(event) {
-    setSelectedRole(event.target.value);
-    setInputError("");
-  }
-
-  function handleMessageChange(event) {
-    setMessage(event.target.value);
-    setInputError("");
-  }
-
-  function handleSetupSubmit(event) {
+  async function startInterview(event) {
     event.preventDefault();
-
-    const validation = validateRole(selectedRole);
-
-    if (!validation.isValid) {
-      setInputError(validation.error);
+    if (!setup.jobTitle.trim() || !setup.companyName.trim() || !setup.jobDescription.trim()) {
+      setError("Add a job title, company, and short job description to continue.");
       return;
     }
 
-    const role = validation.value;
-
-    setInputError("");
-    setMessage("");
-    setInterviewStarted(true);
-
-    setConversation([
-      createMessage(
-        "coach",
-        `Welcome to your ${role} interview practice session. Please introduce yourself and explain why you are interested in this role.`
-      ),
-    ]);
-
-    console.log("Interview started:", {
-      role,
-    });
+    setLoading(true);
+    setError("");
+    try {
+      const result = await generateInterviewQuestions({
+        ...setup,
+        jobTitle: setup.jobTitle.trim(),
+        companyName: setup.companyName.trim(),
+        jobDescription: setup.jobDescription.trim(),
+        candidateSkills: setup.candidateSkills.trim(),
+        candidateExperience: setup.candidateExperience.trim(),
+      });
+      if (!Array.isArray(result?.questions) || !result.questions.length) {
+        throw new Error("No interview questions were returned. Please try again.");
+      }
+      const nextSetup = {
+        ...setup,
+        jobTitle: result.jobTitle || setup.jobTitle,
+        companyName: result.companyName || setup.companyName,
+      };
+      setSetup(nextSetup);
+      setQuestions(result.questions);
+      setAnswers([]);
+      setCurrentIndex(0);
+      setPhase("interview");
+      persistSession({
+        setup: nextSetup,
+        questions: result.questions,
+        answers: [],
+        currentIndex: 0,
+        draftAnswer: "",
+        feedback: null,
+        phase: "interview",
+      });
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setLoading(false);
+    }
   }
 
-  function handleChatSubmit(event) {
+  async function submitAnswer(event) {
     event.preventDefault();
-
-    if (isCoachTyping) {
+    const cleanAnswer = answer.trim();
+    if (cleanAnswer.length < 10) {
+      setError("Give your coach a little more detail before submitting.");
       return;
     }
 
-    const validation =
-      validateInterviewAnswer(message);
-
-    if (!validation.isValid) {
-      setInputError(validation.error);
-      return;
+    setLoading(true);
+    setError("");
+    try {
+      const result = await evaluateInterviewAnswer({
+        jobTitle: setup.jobTitle,
+        companyName: setup.companyName,
+        jobDescription: setup.jobDescription,
+        question: currentQuestion.question,
+        candidateAnswer: cleanAnswer,
+      });
+      setFeedback(result);
+      setAnswers((current) => [...current, {
+        question: currentQuestion,
+        answer: cleanAnswer,
+        feedback: result,
+      }]);
+    } catch (requestError) {
+      setError(requestError.message);
+    } finally {
+      setLoading(false);
     }
-
-    const cleanedAnswer = validation.value;
-
-    setConversation((currentConversation) => [
-      ...currentConversation,
-      createMessage("user", cleanedAnswer),
-    ]);
-
-    setMessage("");
-    setInputError("");
-    setIsCoachTyping(true);
-
-    console.log("Interview answer:", {
-      role: selectedRole,
-      answer: cleanedAnswer,
-    });
-
-    /*
-      Replace the temporary response below with:
-
-      POST /api/interview-coach/message
-
-      The ASP.NET backend must perform the same validation.
-    */
-
-    window.setTimeout(() => {
-      setConversation((currentConversation) => [
-        ...currentConversation,
-        createMessage(
-          "coach",
-          "Thank you. Describe a challenging project or task you completed, the difficulty you faced, and how you handled it."
-        ),
-      ]);
-
-      setIsCoachTyping(false);
-    }, 900);
   }
 
-  function handleMicrophoneClick() {
-    setInputError(
-      "Voice input will become available when the audio API is connected."
-    );
+  function nextQuestion() {
+    setAnswer("");
+    setFeedback(null);
+    setError("");
+    if (currentIndex + 1 >= questions.length) setPhase("complete");
+    else setCurrentIndex((index) => index + 1);
   }
 
-  function startNewInterview() {
-    setSelectedRole("");
-    setConversation([]);
-    setMessage("");
-    setInputError("");
-    setIsCoachTyping(false);
-    setInterviewStarted(false);
-    closeMenu();
+  function resetInterview() {
+    persistSession(null);
+    setSetup(EMPTY_SETUP);
+    setQuestions([]);
+    setAnswers([]);
+    setCurrentIndex(0);
+    setAnswer("");
+    setFeedback(null);
+    setError("");
+    setPhase("setup");
   }
 
-  function renderNavigationMenu() {
-    if (!menuOpen) {
-      return null;
-    }
-
+  function renderSetup() {
     return (
-      <>
-        <button
-          type="button"
-          className="interview-menu-overlay"
-          onClick={closeMenu}
-          aria-label="Close navigation menu"
-        />
-
-        <aside
-          className="interview-menu"
-          aria-label="Dashboard navigation"
-        >
-          <button
-            type="button"
-            onClick={() => goToPage("/dashboard")}
-          >
-            <LayoutDashboard size={17} />
-            <span>Dashboard</span>
-          </button>
-
-          <button
-            type="button"
-            className="interview-menu-active"
-            onClick={closeMenu}
-            aria-current="page"
-          >
-            <UsersRound size={17} />
-            <span>Interview Coach</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() =>
-              goToPage("/dashboard/cv-tailor")
-            }
-          >
-            <FileText size={17} />
-            <span>CV Tailor</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() =>
-              goToPage("/dashboard/jobs")
-            }
-          >
-            <BriefcaseBusiness size={17} />
-            <span>Jobs</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() =>
-              goToPage("/dashboard/profile")
-            }
-          >
-            <UserRound size={17} />
-            <span>Profile</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() =>
-              goToPage("/dashboard/notifications")
-            }
-          >
-            <Bell size={17} />
-            <span>Notifications</span>
-          </button>
-
-          <button
-            type="button"
-            onClick={() =>
-              goToPage("/dashboard/settings")
-            }
-          >
-            <Settings size={17} />
-            <span>Settings</span>
-          </button>
-        </aside>
-      </>
-    );
-  }
-
-  function renderInputError() {
-    if (!inputError) {
-      return null;
-    }
-
-    return (
-      <p
-        id="interview-input-error"
-        className="interview-input-error"
-        role="alert"
-      >
-        {inputError}
-      </p>
-    );
-  }
-
-  function renderSetupScreen() {
-    return (
-      <div className="interview-content">
-        <div className="interview-heading">
-          <h1>Interview Ready?</h1>
-
-          <p>
-            Practice with real-world interview questions
-            and candidate experiences
-          </p>
-        </div>
-
-        <form
-          className="interview-search-form"
-          onSubmit={handleSetupSubmit}
-          noValidate
-        >
-          <select
-            value={selectedRole}
-            onChange={handleRoleChange}
-            aria-label="Select an interview role"
-            aria-invalid={Boolean(inputError)}
-            aria-describedby={
-              inputError
-                ? "interview-input-error"
-                : undefined
-            }
-          >
-            <option value="">
-              Select an interview role
-            </option>
-
-            {ALLOWED_INTERVIEW_ROLES.map((role) => (
-              <option key={role} value={role}>
-                {role}
-              </option>
-            ))}
-          </select>
-
-          <div className="interview-input-actions">
-            <button
-              type="button"
-              className="interview-icon-button"
-              onClick={handleMicrophoneClick}
-              aria-label="Use microphone"
-              title="Use microphone"
-            >
-              <Mic size={19} strokeWidth={2.2} />
-            </button>
-
-            <button
-              type="submit"
-              className="interview-icon-button"
-              disabled={!selectedRole}
-              aria-label="Start interview"
-            >
-              <Search size={20} strokeWidth={2.3} />
-            </button>
+      <div className="coach-setup-grid">
+        <section className="coach-intro-panel">
+          <span className="coach-eyebrow"><Sparkles size={15} /> AI interview coach</span>
+          <h2>Practice for the role you actually want.</h2>
+          <p>Get tailored questions and clear, practical feedback after every answer.</p>
+          <div className="coach-feature-list">
+            <div><Target /><span><strong>Role-specific practice</strong>Questions shaped around the job and company.</span></div>
+            <div><MessageSquareText /><span><strong>Instant feedback</strong>See strengths, improvements, and a stronger answer.</span></div>
+            <div><Trophy /><span><strong>Track your score</strong>Finish with a clear session summary.</span></div>
           </div>
-        </form>
-
-        {renderInputError()}
-
-        <p className="interview-example-text">
-          Select a role to begin your interview practice
-        </p>
-      </div>
-    );
-  }
-
-  function renderChatScreen() {
-    return (
-      <div className="interview-chat-layout">
-        <div className="interview-chat-header">
-          <div>
-            <h1>Interview Session</h1>
-
-            <p>
-              {selectedRole} interview practice
-            </p>
-          </div>
-
-          <button
-            type="button"
-            className="interview-new-button"
-            onClick={startNewInterview}
-          >
-            <RotateCcw size={15} />
-            <span>New Interview</span>
-          </button>
-        </div>
-
-        <section
-          className="interview-chat-area"
-          aria-label="Interview conversation"
-          aria-live="polite"
-        >
-          {conversation.map((chatMessage) => (
-            <div
-              key={chatMessage.id}
-              className={`interview-message-row ${
-                chatMessage.sender === "user"
-                  ? "interview-message-row-user"
-                  : "interview-message-row-coach"
-              }`}
-            >
-              <div
-                className={`interview-message ${
-                  chatMessage.sender === "user"
-                    ? "interview-message-user"
-                    : "interview-message-coach"
-                }`}
-              >
-                <span className="interview-message-name">
-                  {chatMessage.sender === "user"
-                    ? "You"
-                    : "Interview Coach"}
-                </span>
-
-                <p>{chatMessage.text}</p>
-              </div>
-            </div>
-          ))}
-
-          {isCoachTyping && (
-            <div className="interview-message-row interview-message-row-coach">
-              <div className="interview-message interview-message-coach interview-typing-message">
-                <span className="interview-message-name">
-                  Interview Coach
-                </span>
-
-                <div
-                  className="interview-typing-dots"
-                  aria-label="Interview Coach is preparing a response"
-                >
-                  <span />
-                  <span />
-                  <span />
-                </div>
-              </div>
-            </div>
-          )}
-
-          <div ref={chatEndRef} />
         </section>
 
-        <div className="interview-chat-input-section">
-          <form
-            className="interview-chat-form"
-            onSubmit={handleChatSubmit}
-            noValidate
-          >
-            <input
-              type="text"
-              value={message}
-              onChange={handleMessageChange}
-              maxLength={MAX_ANSWER_LENGTH}
-              placeholder="Type your answer..."
-              aria-label="Type your interview answer"
-              aria-invalid={Boolean(inputError)}
-              aria-describedby={
-                inputError
-                  ? "interview-input-error"
-                  : undefined
-              }
-              autoComplete="off"
-              spellCheck="true"
-            />
-
-            <div className="interview-input-actions">
-              <button
-                type="button"
-                className="interview-icon-button"
-                onClick={handleMicrophoneClick}
-                aria-label="Answer with microphone"
-                title="Answer with microphone"
-              >
-                <Mic size={19} strokeWidth={2.2} />
-              </button>
-
-              <button
-                type="submit"
-                className="interview-send-button"
-                disabled={
-                  !message.trim() || isCoachTyping
-                }
-                aria-label="Send answer"
-              >
-                <Send size={18} strokeWidth={2.3} />
-              </button>
-            </div>
-          </form>
-
-          <div className="interview-chat-form-footer">
-            {renderInputError()}
-
-            <span className="interview-character-count">
-              {message.length}/{MAX_ANSWER_LENGTH}
-            </span>
+        <form className="coach-setup-card" onSubmit={startInterview}>
+          <div className="coach-card-heading"><div><span>Set up your session</span><h2>Tell us about the opportunity</h2></div><BriefcaseBusiness /></div>
+          <div className="coach-form-grid">
+            <label>Job title *<input name="jobTitle" value={setup.jobTitle} onChange={updateSetup} placeholder="e.g. DevOps Engineer" /></label>
+            <label>Company *<input name="companyName" value={setup.companyName} onChange={updateSetup} placeholder="e.g. Google" /></label>
+            <label className="coach-wide">Job description *<textarea name="jobDescription" value={setup.jobDescription} onChange={updateSetup} placeholder="Paste the key responsibilities or describe the role..." rows="4" /></label>
+            <label>Key skills<input name="candidateSkills" value={setup.candidateSkills} onChange={updateSetup} placeholder="Python, React, CI/CD" /></label>
+            <label>Experience<input name="candidateExperience" value={setup.candidateExperience} onChange={updateSetup} placeholder="e.g. 4 years in DevOps" /></label>
+            <label className="coach-wide">Number of questions<select name="numberOfQuestions" value={setup.numberOfQuestions} onChange={updateSetup}><option value="5">5 questions · Quick practice</option><option value="10">10 questions · Full interview</option></select></label>
           </div>
-        </div>
+          {error && <p className="coach-error" role="alert"><CircleAlert size={16} />{error}</p>}
+          <button className="coach-primary-button" disabled={loading}>{loading ? <><LoaderCircle className="coach-spinner" />Preparing your interview...</> : <>Generate my interview<ArrowRight size={17} /></>}</button>
+          <p className="coach-privacy">Your active interview is saved only in this browser tab.</p>
+        </form>
       </div>
     );
   }
 
-  return (
-    <main
-      className={`interview-screen ${
-        interviewStarted
-          ? "interview-screen-active"
-          : ""
-      }`}
-    >
-      <header className="interview-header">
-        <button
-          type="button"
-          className="interview-logo-button"
-          onClick={() => navigate("/dashboard")}
-          aria-label="Go to dashboard"
-        >
-          <img
-            src={logo}
-            alt="DWUMA"
-            className="interview-logo"
-          />
-        </button>
-      </header>
-
-      <section
-        className={`interview-body ${
-          interviewStarted
-            ? "interview-body-active"
-            : ""
-        }`}
-      >
-        <button
-          type="button"
-          className="interview-menu-button"
-          onClick={() =>
-            setMenuOpen((currentValue) => !currentValue)
-          }
-          aria-label={
-            menuOpen
-              ? "Close navigation menu"
-              : "Open navigation menu"
-          }
-          aria-expanded={menuOpen}
-        >
-          <Menu size={29} strokeWidth={1.8} />
-        </button>
-
-        {renderNavigationMenu()}
-
-        {interviewStarted
-          ? renderChatScreen()
-          : renderSetupScreen()}
+  function renderFeedback() {
+    return (
+      <section className="coach-feedback" aria-live="polite">
+        <div className="coach-feedback-summary"><ScoreRing score={feedback.score} /><div><span className="coach-eyebrow"><CheckCircle2 size={14} /> Answer reviewed</span><h2>{feedback.overallAssessment}</h2></div></div>
+        <div className="coach-feedback-grid">
+          <div className="coach-feedback-card coach-strengths"><h3><CheckCircle2 /> What worked</h3><ul>{(feedback.strengths || []).map((item) => <li key={item}>{item}</li>)}</ul></div>
+          <div className="coach-feedback-card coach-improvements"><h3><Target /> Make it stronger</h3><ul>{(feedback.improvements || []).map((item) => <li key={item}>{item}</li>)}</ul></div>
+        </div>
+        {feedback.improvedAnswer && <div className="coach-model-answer"><h3><Sparkles /> A stronger answer</h3><p>{feedback.improvedAnswer}</p></div>}
+        {feedback.deliveryTip && <div className="coach-delivery-tip"><Lightbulb /><div><strong>Delivery tip</strong><p>{feedback.deliveryTip}</p></div></div>}
+        <button className="coach-primary-button coach-next-button" onClick={nextQuestion}>{currentIndex + 1 === questions.length ? <>View session results<Trophy size={17} /></> : <>Next question<ChevronRight size={18} /></>}</button>
       </section>
-    </main>
-  );
+    );
+  }
+
+  function renderInterview() {
+    const progress = ((currentIndex + (feedback ? 1 : 0)) / questions.length) * 100;
+    return (
+      <div className="coach-session">
+        <div className="coach-session-topbar">
+          <button className="coach-text-button" onClick={resetInterview}><ArrowLeft />End session</button>
+          <div className="coach-session-role"><strong>{setup.jobTitle}</strong><span>{setup.companyName}</span></div>
+          <span className="coach-progress-label">{currentIndex + 1} of {questions.length}</span>
+        </div>
+        <div className="coach-progress-track"><span style={{ width: `${progress}%` }} /></div>
+        {!feedback ? <section className="coach-question-card">
+          <div className="coach-question-meta"><span className={`coach-category coach-category-${currentQuestion.category}`}>{currentQuestion.category || "general"}</span><span>{currentQuestion.difficulty || "practice"}</span></div>
+          <p className="coach-question-number">Question {currentIndex + 1}</p>
+          <h2>{currentQuestion.question}</h2>
+          {currentQuestion.whatInterviewerLooksFor && <details><summary><Lightbulb size={15} />What the interviewer is looking for</summary><p>{currentQuestion.whatInterviewerLooksFor}</p></details>}
+          <form onSubmit={submitAnswer} className="coach-answer-form">
+            <label htmlFor="interview-answer">Your answer</label>
+            <textarea id="interview-answer" value={answer} onChange={(event) => { setAnswer(event.target.value); setError(""); }} maxLength={MAX_ANSWER_LENGTH} rows="8" placeholder="Structure your thinking, give a specific example, and explain the outcome..." autoFocus />
+            <div className="coach-answer-footer"><span>{answer.length.toLocaleString()} / {MAX_ANSWER_LENGTH.toLocaleString()}</span><button className="coach-primary-button" disabled={loading || answer.trim().length < 10}>{loading ? <><LoaderCircle className="coach-spinner" />Reviewing...</> : <>Get feedback<ArrowRight size={17} /></>}</button></div>
+            {error && <p className="coach-error" role="alert"><CircleAlert size={16} />{error}</p>}
+          </form>
+        </section> : renderFeedback()}
+      </div>
+    );
+  }
+
+  function renderComplete() {
+    return <section className="coach-complete">
+      <div className="coach-trophy"><Trophy /></div><span className="coach-eyebrow">Session complete</span><h2>You finished your {setup.jobTitle} practice interview.</h2><p>Use the feedback as a rehearsal guide, then come back and try the questions again in your own words.</p>
+      <ScoreRing score={averageScore} label="Average score" />
+      <div className="coach-results-list">{answers.map((item, index) => <div key={`${item.question.number}-${index}`}><span>{index + 1}</span><p>{item.question.question}</p><strong>{item.feedback.score}/100</strong></div>)}</div>
+      <button className="coach-primary-button" onClick={resetInterview}><RotateCcw size={17} />Start a new interview</button>
+    </section>;
+  }
+
+  return <DashboardLayout><div className="coach-page"><header className="coach-page-header"><div><span className="coach-eyebrow"><Sparkles size={14} />Personalised practice</span><h1>Interview Coach</h1><p>Build confidence with questions tailored to your next opportunity.</p></div>{phase !== "setup" && <div className="coach-header-stat"><strong>{completedCount}</strong><span>answers reviewed</span></div>}</header>{phase === "setup" ? renderSetup() : phase === "complete" ? renderComplete() : renderInterview()}</div></DashboardLayout>;
 }
 
 export default InterviewCoach;

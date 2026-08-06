@@ -70,8 +70,8 @@ function DashboardSidebar({
   }
 
   function handleLogout() {
-    localStorage.removeItem("dwumaToken");
-    sessionStorage.removeItem("dwumaToken");
+    localStorage.clear();
+    sessionStorage.clear();
     navigate("/login");
   }
 
@@ -82,7 +82,7 @@ function DashboardSidebar({
       }`}
     >
       <div className="dashboard-sidebar-brand">
-        DWUMA
+           <img src={'/src/assets/logo-white.svg'} alt="Dwuma Logo" height="40" />
       </div>
 
       <nav className="dashboard-sidebar-navigation">

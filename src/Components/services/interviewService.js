@@ -42,10 +42,30 @@ async function postInterview(endpoint, payload) {
   return data;
 }
 
+async function requestInterview(endpoint, options = {}) {
+  const token = getToken();
+  const response = await fetch(`${API_BASE_URL}/interview/${endpoint}`, {
+    ...options,
+    headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json", ...options.headers },
+  });
+  if (response.status === 204) return null;
+  const data = await response.json().catch(() => null);
+  if (!response.ok) throw new Error(data?.message || "The interview request failed.");
+  return data;
+}
+
 export function generateInterviewQuestions(payload) {
   return postInterview("questions", payload);
 }
 
 export function evaluateInterviewAnswer(payload) {
   return postInterview("evaluate", payload);
+}
+
+export function completeInterview(sessionId) {
+  return requestInterview(`sessions/${sessionId}/complete`, { method: "POST" });
+}
+
+export function getLatestInterview() {
+  return requestInterview("latest");
 }

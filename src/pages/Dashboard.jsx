@@ -1,9 +1,11 @@
+import { useEffect, useState } from "react";
 import DashboardLayout from "../Components/dashboard/DashboardLayout";
 import InterviewScoreCard from "../Components/dashboard/InterviewScoreCard";
 import RecommendedJobs from "../Components/dashboard/RecommendedJobs";
 import SkillGapCard from "../Components/dashboard/SkillGapCard";
 
 import "../Components/dashboard/Dashboard.css";
+import { getLatestInterview } from "../Components/services/interviewService";
 
 function Dashboard() {
   /*
@@ -13,11 +15,21 @@ function Dashboard() {
     GET /api/dashboard
   */
 
+  const [latestInterview, setLatestInterview] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    getLatestInterview()
+      .then((result) => { if (active) setLatestInterview(result); })
+      .catch(() => { if (active) setLatestInterview(null); });
+    return () => { active = false; };
+  }, []);
+
   const dashboardData = null;
 
   const user = dashboardData?.user ?? null;
   const skills = dashboardData?.trendingSkills ?? [];
-  const interview = dashboardData?.latestInterview ?? null;
+  const interview = latestInterview;
   const jobs = dashboardData?.recommendedJobs ?? [];
   const unreadNotifications =
     dashboardData?.unreadNotifications ?? 0;

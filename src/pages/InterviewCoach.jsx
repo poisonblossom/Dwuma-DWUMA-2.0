@@ -19,6 +19,7 @@ import DashboardLayout from "../Components/dashboard/DashboardLayout";
 import {
   evaluateInterviewAnswer,
   generateInterviewQuestions,
+  completeInterview,
 } from "../Components/services/interviewService";
 import "../Components/dashboard/Dashboard.css";
 import "./InterviewCoach.css";
@@ -38,7 +39,8 @@ const EMPTY_SETUP = {
 function restoreSession() {
   try {
     const value = JSON.parse(sessionStorage.getItem(SESSION_KEY));
-    if (value?.setup && Array.isArray(value.questions) && value.questions.length) {
+    if (value?.sessionId && value?.setup && Array.isArray(value.questions) &&
+        value.questions.length && value.questions.every((question) => question.id)) {
       return value;
     }
   } catch {
@@ -67,6 +69,7 @@ function InterviewCoach() {
     restored?.answers?.[restored.currentIndex];
   const [setup, setSetup] = useState(restored?.setup || EMPTY_SETUP);
   const [questions, setQuestions] = useState(restored?.questions || []);
+  const [sessionId, setSessionId] = useState(restored?.sessionId || null);
   const [answers, setAnswers] = useState(restored?.answers || []);
   const [currentIndex, setCurrentIndex] = useState(restored?.currentIndex || 0);
   const [answer, setAnswer] = useState(
@@ -95,6 +98,7 @@ function InterviewCoach() {
     if (!questions.length || phase === "setup") return;
     persistSession({
       setup,
+      sessionId,
       questions,
       answers,
       currentIndex,
@@ -102,7 +106,7 @@ function InterviewCoach() {
       feedback,
       phase,
     });
-  }, [setup, questions, answers, currentIndex, answer, feedback, phase]);
+  }, [setup, sessionId, questions, answers, currentIndex, answer, feedback, phase]);
 
   function updateSetup(event) {
     const { name, value } = event.target;
@@ -141,11 +145,13 @@ function InterviewCoach() {
       };
       setSetup(nextSetup);
       setQuestions(result.questions);
+      setSessionId(result.sessionId);
       setAnswers([]);
       setCurrentIndex(0);
       setPhase("interview");
       persistSession({
         setup: nextSetup,
+        sessionId: result.sessionId,
         questions: result.questions,
         answers: [],
         currentIndex: 0,
@@ -173,6 +179,8 @@ function InterviewCoach() {
     setError("");
     try {
       const result = await evaluateInterviewAnswer({
+        sessionId,
+        questionId: currentQuestion.id,
         jobTitle: setup.jobTitle,
         companyName: setup.companyName,
         jobDescription: setup.jobDescription,
@@ -204,9 +212,18 @@ function InterviewCoach() {
     if (currentIndex > 0) goToQuestion(currentIndex - 1);
   }
 
-  function nextQuestion() {
+  async function nextQuestion() {
     if (currentIndex + 1 >= questions.length) {
-      setPhase("complete");
+      setLoading(true);
+      setError("");
+      try {
+        await completeInterview(sessionId);
+        setPhase("complete");
+      } catch (requestError) {
+        setError(requestError.message);
+      } finally {
+        setLoading(false);
+      }
       return;
     }
     goToQuestion(currentIndex + 1);
@@ -216,6 +233,7 @@ function InterviewCoach() {
     persistSession(null);
     setSetup(EMPTY_SETUP);
     setQuestions([]);
+    setSessionId(null);
     setAnswers([]);
     setCurrentIndex(0);
     setAnswer("");
@@ -298,7 +316,7 @@ function InterviewCoach() {
         <nav className="coach-question-navigation" aria-label="Interview question navigation">
           <button className="coach-secondary-button" onClick={previousQuestion} disabled={currentIndex === 0}><ArrowLeft size={16} />Previous question</button>
           <div className="coach-question-dots">{questions.map((question, index) => <button key={question.number || index} className={index === currentIndex ? "coach-dot-active" : index < answers.length ? "coach-dot-complete" : ""} onClick={() => index <= answers.length && goToQuestion(index)} disabled={index > answers.length} aria-label={`Go to question ${index + 1}`} aria-current={index === currentIndex ? "step" : undefined}>{index + 1}</button>)}</div>
-          <button className="coach-primary-button" onClick={nextQuestion} disabled={!feedback}>{currentIndex + 1 === questions.length ? <>View results<Trophy size={17} /></> : <>Next question<ChevronRight size={18} /></>}</button>
+          <button className="coach-primary-button" onClick={nextQuestion} disabled={!feedback || loading}>{currentIndex + 1 === questions.length ? <>{loading ? "Finalising..." : "View results"}<Trophy size={17} /></> : <>Next question<ChevronRight size={18} /></>}</button>
         </nav>
       </div>
     );

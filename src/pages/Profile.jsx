@@ -84,11 +84,20 @@ function Profile() {
   const storedUser = readStoredJson("dwumaUser") || {};
   const onboarding = readStoredJson("dwumaOnboardingData") || {};
   const displayProfile = { ...storedUser, ...onboarding, ...(profile || {}) };
+  const onboardingLocation =
+    valueOf(onboarding, "location") ||
+    (onboarding.city && onboarding.region
+      ? `${onboarding.city}, ${onboarding.region}`
+      : "");
+  const profileLocation =
+    valueOf(profile, "location", "city") ||
+    valueOf(storedUser, "location", "city") ||
+    onboardingLocation;
 
   const information = [
     { label: "Email Address", value: valueOf(displayProfile, "email"), icon: Mail },
-    { label: "Phone Number", value: valueOf(displayProfile, "phoneNumber", "phone"), icon: Phone },
-    { label: "Location", value: valueOf(displayProfile, "location", "city"), icon: MapPin },
+    { label: "Phone Number", value: valueOf(displayProfile, "phoneNumber", "phone") || "Not added", icon: Phone },
+    { label: "Location", value: profileLocation || "Not added", icon: MapPin },
     {
       label: "Field of Study",
       value: valueOf(displayProfile, "fieldOfStudy", "fieldOfWork", "studyField") || "Not added",
@@ -119,7 +128,7 @@ function Profile() {
       fullName: valueOf(displayProfile, "fullName", "name", "username"),
       email: valueOf(displayProfile, "email"),
       phoneNumber: valueOf(displayProfile, "phoneNumber", "phone"),
-      location: valueOf(displayProfile, "location", "city"),
+      location: profileLocation,
       fieldOfStudy: valueOf(displayProfile, "fieldOfStudy", "fieldOfWork", "studyField"),
       education: valueOf(displayProfile, "education", "educationLevel", "degree"),
       linkedin: valueOf(displayProfile, "linkedin", "linkedIn", "linkedinUrl"),

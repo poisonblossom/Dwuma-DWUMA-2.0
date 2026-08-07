@@ -177,6 +177,356 @@
 
 /* Profile page */
 
+.profile-page-reference {
+  padding: 18px 0;
+  background: transparent;
+}
+
+.profile-reference-grid {
+  display: grid;
+  grid-template-columns: minmax(320px, 0.92fr) minmax(460px, 1.45fr);
+  align-items: start;
+  gap: 18px;
+}
+
+.dashboard-page .profile-reference-information,
+.dashboard-page .profile-reference-card {
+  padding: 20px;
+  border-radius: 12px;
+  box-shadow: 0 5px 18px rgba(36, 19, 19, 0.045);
+}
+
+.profile-reference-information {
+  min-height: 420px;
+}
+
+.profile-reference-right {
+  display: grid;
+  gap: 16px;
+}
+
+.profile-reference-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 18px;
+}
+
+.profile-reference-heading h2 {
+  margin: 0;
+  color: #34282a;
+  font-size: 0.88rem;
+}
+
+.profile-reference-heading .secondary-button {
+  min-height: 33px;
+  padding: 6px 11px;
+  border-radius: 7px;
+  color: var(--page-primary);
+  font-size: 0.67rem;
+}
+
+.profile-reference-details {
+  display: grid;
+  gap: 20px;
+}
+
+.profile-reference-detail {
+  display: grid;
+  grid-template-columns: 22px 105px minmax(0, 1fr);
+  align-items: center;
+  gap: 8px;
+  min-width: 0;
+}
+
+.profile-reference-detail > svg {
+  color: #746b6c;
+}
+
+.profile-reference-detail > span {
+  color: #8a7c7e;
+  font-size: 0.67rem;
+}
+
+.profile-reference-detail strong,
+.profile-reference-detail a {
+  min-width: 0;
+  overflow-wrap: anywhere;
+  color: #34282a;
+  font-size: 0.7rem;
+  font-weight: 700;
+  text-decoration: none;
+}
+
+.profile-reference-detail a {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  color: var(--page-primary);
+}
+
+.profile-reference-card .skills-list {
+  gap: 9px;
+}
+
+.profile-reference-card .skill-pill {
+  padding: 7px 13px;
+  font-size: 0.65rem;
+}
+
+.profile-reference-card .resume-content {
+  min-height: 54px;
+}
+
+.profile-reference-card .resume-icon {
+  width: 42px;
+  height: 42px;
+  border-radius: 8px;
+}
+
+.profile-reference-empty,
+.profile-reference-empty-row {
+  color: #8a7c7e;
+  font-size: 0.7rem;
+}
+
+.profile-reference-empty {
+  margin: 4px 0 2px;
+}
+
+.profile-reference-empty-row {
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  gap: 11px;
+}
+
+.profile-reference-empty-row > svg {
+  color: var(--page-primary);
+}
+
+.profile-reference-empty-row .secondary-button {
+  margin-left: auto;
+}
+
+.profile-saved-jobs-list {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 9px;
+}
+
+.profile-saved-job {
+  display: grid;
+  grid-template-columns: 35px minmax(0, 1fr) auto;
+  align-items: center;
+  gap: 9px;
+  padding: 9px;
+  background: #fcf8f8;
+  border: 1px solid #f0e3e3;
+  border-radius: 8px;
+}
+
+.profile-saved-job-icon {
+  width: 35px;
+  height: 35px;
+  display: grid;
+  place-items: center;
+  color: var(--page-primary);
+  background: var(--page-primary-light);
+  border-radius: 7px;
+}
+
+.profile-saved-job strong,
+.profile-saved-job span {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.profile-saved-job strong {
+  color: #382b2d;
+  font-size: 0.69rem;
+}
+
+.profile-saved-job span {
+  margin-top: 4px;
+  color: #8a7b7d;
+  font-size: 0.6rem;
+}
+
+.profile-saved-job > a {
+  color: var(--page-primary);
+}
+
+.profile-edit-overlay {
+  position: fixed;
+  inset: 0;
+  z-index: 100;
+  display: grid;
+  place-items: center;
+  padding: 22px;
+  background: rgba(45, 12, 14, 0.52);
+  backdrop-filter: blur(3px);
+}
+
+.profile-edit-dialog {
+  width: min(100%, 680px);
+  max-height: calc(100vh - 44px);
+  overflow-y: auto;
+  padding: 25px;
+  background: #ffffff;
+  border-radius: 16px;
+  box-shadow: 0 24px 60px rgba(35, 0, 2, 0.25);
+}
+
+.profile-edit-dialog-heading {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  margin-bottom: 22px;
+}
+
+.profile-edit-dialog-heading span {
+  color: var(--page-primary);
+  font-size: 0.65rem;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.profile-edit-dialog-heading h2 {
+  margin: 5px 0 0;
+  color: #34282a;
+  font-size: 1.2rem;
+}
+
+.profile-edit-dialog-heading > button {
+  width: 35px;
+  height: 35px;
+  display: grid;
+  place-items: center;
+  padding: 0;
+  color: #776769;
+  background: #faf4f4;
+  border: 0;
+  border-radius: 8px;
+}
+
+.profile-edit-form {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 16px;
+}
+
+.profile-edit-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+  color: #554749;
+  font-size: 0.7rem;
+  font-weight: 700;
+}
+
+.profile-edit-form input {
+  width: 100%;
+  height: 42px;
+  padding: 0 12px;
+  color: #302628;
+  background: #fffdfd;
+  border: 1px solid #e1d5d6;
+  border-radius: 8px;
+  outline: none;
+  font-size: 0.75rem;
+}
+
+.profile-edit-form input:focus {
+  border-color: var(--page-primary);
+  box-shadow: 0 0 0 3px rgba(133, 8, 8, 0.1);
+}
+
+.profile-edit-form small {
+  color: #938486;
+  font-size: 0.6rem;
+  font-weight: 500;
+}
+
+.profile-edit-wide,
+.profile-edit-actions,
+.profile-edit-message {
+  grid-column: 1 / -1;
+}
+
+.profile-edit-message {
+  margin: 0;
+  padding: 10px 12px;
+  color: #9b0b10;
+  background: #fff0f0;
+  border-radius: 8px;
+  font-size: 0.7rem;
+}
+
+.profile-edit-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 9px;
+  padding-top: 5px;
+}
+
+@media (max-width: 1050px) {
+  .profile-reference-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-reference-information {
+    min-height: 0;
+  }
+}
+
+@media (max-width: 620px) {
+  .profile-page-reference {
+    padding: 0;
+  }
+
+  .dashboard-page .profile-reference-information,
+  .dashboard-page .profile-reference-card {
+    padding: 17px;
+  }
+
+  .profile-reference-detail {
+    grid-template-columns: 20px 90px minmax(0, 1fr);
+  }
+
+  .profile-reference-heading {
+    align-items: flex-start;
+  }
+
+  .profile-saved-jobs-list {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-edit-form {
+    grid-template-columns: 1fr;
+  }
+
+  .profile-edit-wide,
+  .profile-edit-actions,
+  .profile-edit-message {
+    grid-column: auto;
+  }
+
+  .profile-reference-empty-row,
+  .profile-reference-card .resume-content {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+
+  .profile-reference-empty-row .secondary-button {
+    margin-left: 0;
+  }
+}
+
 .profile-grid {
   display: grid;
   grid-template-columns: minmax(0, 1.05fr) minmax(320px, 0.95fr);

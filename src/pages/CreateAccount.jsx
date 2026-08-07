@@ -11,6 +11,18 @@ const API_BASE_URL =
   import.meta.env.VITE_API_BASE_URL ||
   "https://dwuma-api.onrender.com/api";
 
+function getPasswordRequirements(password) {
+  return [
+    { label: "At least 8 characters", met: password.length >= 8 },
+    { label: "One uppercase letter", met: /[A-Z]/.test(password) },
+    { label: "One number", met: /\d/.test(password) },
+    {
+      label: "One special character",
+      met: /[^A-Za-z0-9\s]/.test(password),
+    },
+  ];
+}
+
 function CreateAccount() {
   const [, navigate] = useLocation();
 
@@ -39,6 +51,8 @@ function CreateAccount() {
 
   const [isSubmitting, setIsSubmitting] =
     useState(false);
+
+  const passwordRequirements = getPasswordRequirements(formData.password);
 
   function handleChange(event) {
     const { name, value } = event.target;
@@ -79,6 +93,18 @@ function CreateAccount() {
 
     if (formData.password.length < 8) {
       return "Password must contain at least 8 characters.";
+    }
+
+    if (!/[A-Z]/.test(formData.password)) {
+      return "Password must contain at least one uppercase letter.";
+    }
+
+    if (!/\d/.test(formData.password)) {
+      return "Password must contain at least one number.";
+    }
+
+    if (!/[^A-Za-z0-9\s]/.test(formData.password)) {
+      return "Password must contain at least one special character.";
     }
 
     if (
@@ -153,10 +179,8 @@ function CreateAccount() {
         );
       }
 
-      sessionStorage.setItem(
-        "pendingVerificationEmail",
-        email,
-      );
+      sessionStorage.removeItem("dwumaPendingOnboarding");
+      sessionStorage.setItem("pendingVerificationEmail", email);
 
       navigate("/email-verification", {
         replace: true,
@@ -269,6 +293,7 @@ function CreateAccount() {
                     autoComplete="new-password"
                     placeholder="Create a password"
                     disabled={isSubmitting}
+                    aria-describedby="password-requirements"
                   />
 
                   <button
@@ -290,6 +315,26 @@ function CreateAccount() {
                       ? "Hide"
                       : "Show"}
                   </button>
+                </div>
+
+                <div
+                  id="password-requirements"
+                  className="create-password-requirements"
+                  aria-live="polite"
+                >
+                  <span className="create-password-requirements-title">
+                    Your password must include:
+                  </span>
+                  <ul>
+                    {passwordRequirements.map((requirement) => (
+                      <li
+                        key={requirement.label}
+                        className={requirement.met ? "requirement-met" : ""}
+                      >
+                        {requirement.label}
+                      </li>
+                    ))}
+                  </ul>
                 </div>
               </div>
 

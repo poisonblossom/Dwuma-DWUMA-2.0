@@ -150,6 +150,50 @@
   transform: translateY(-50%);
 }
 
+.create-password-requirements {
+  margin: 11px 6px 0;
+  padding: 11px 13px;
+  color: rgba(255, 255, 255, 0.72);
+  background: rgba(255, 255, 255, 0.08);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 10px;
+}
+
+.create-password-requirements-title {
+  display: block;
+  margin-bottom: 8px;
+  color: rgba(255, 255, 255, 0.85);
+  font-size: 10px;
+  font-weight: 600;
+}
+
+.create-password-requirements ul {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 6px 10px;
+  margin: 0;
+  padding-left: 17px;
+  list-style: disc;
+}
+
+.create-password-requirements li {
+  padding-left: 1px;
+  font-size: 9px;
+  line-height: 1.35;
+  transition: color 0.2s ease;
+}
+
+.create-password-requirements .requirement-met {
+  color: #ffffff;
+  font-weight: 800;
+}
+
+@media (max-width: 430px) {
+  .create-password-requirements ul {
+    grid-template-columns: 1fr;
+  }
+}
+
 /* ERROR */
 
 .create-account-error {

@@ -3,8 +3,6 @@ import {
   Bell,
   Eye,
   LockKeyhole,
-  Pencil,
-  Save,
   Trash2,
   UserRound,
 } from "lucide-react";
@@ -40,14 +38,6 @@ const settingsSections = [
 ];
 
 const initialSettings = {
-  account: {
-    fullName: "",
-    email: "",
-    phoneNumber: "",
-    location: "",
-    careerField: "",
-  },
-
   notifications: {
     emailNotifications: false,
     jobRecommendations: false,
@@ -95,18 +85,10 @@ function Settings() {
   const [activeSection, setActiveSection] = useState("account");
 
   const [settings, setSettings] = useState(initialSettings);
-  const [savedAccount, setSavedAccount] = useState(
-    initialSettings.account,
-  );
-
   const [isLoading, setIsLoading] = useState(true);
-  const [isEditingAccount, setIsEditingAccount] = useState(false);
-  const [isSavingAccount, setIsSavingAccount] = useState(false);
   const [savingSection, setSavingSection] = useState("");
 
   async function fetchSettings() {
-    setIsLoading(true);
-
     try {
       const token = getAuthToken();
 
@@ -129,14 +111,6 @@ function Settings() {
       const data = await response.json();
 
       const loadedSettings = {
-        account: {
-          fullName: data?.account?.fullName || "",
-          email: data?.account?.email || "",
-          phoneNumber: data?.account?.phoneNumber || "",
-          location: data?.account?.location || "",
-          careerField: data?.account?.careerField || "",
-        },
-
         notifications: {
           emailNotifications:
             data?.notifications?.emailNotifications ?? false,
@@ -167,7 +141,6 @@ function Settings() {
       };
 
       setSettings(loadedSettings);
-      setSavedAccount(loadedSettings.account);
     } catch {
       // Keep empty settings while the backend is unavailable.
     } finally {
@@ -176,65 +149,9 @@ function Settings() {
   }
 
   useEffect(() => {
-    fetchSettings();
+    const loadSettings = window.setTimeout(fetchSettings, 0);
+    return () => window.clearTimeout(loadSettings);
   }, []);
-
-  function handleAccountChange(event) {
-    const { name, value } = event.target;
-
-    setSettings((currentSettings) => ({
-      ...currentSettings,
-
-      account: {
-        ...currentSettings.account,
-        [name]: value,
-      },
-    }));
-  }
-
-  async function saveAccountInformation() {
-    setIsSavingAccount(true);
-
-    try {
-      const token = getAuthToken();
-
-      const response = await fetch(
-        `${API_BASE_URL}/settings/account`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            ...(token
-              ? {
-                  Authorization: `Bearer ${token}`,
-                }
-              : {}),
-          },
-          body: JSON.stringify(settings.account),
-        },
-      );
-
-      if (!response.ok) {
-        return;
-      }
-
-      setSavedAccount(settings.account);
-      setIsEditingAccount(false);
-    } catch {
-      // Keep the form open if saving fails.
-    } finally {
-      setIsSavingAccount(false);
-    }
-  }
-
-  function cancelAccountEditing() {
-    setSettings((currentSettings) => ({
-      ...currentSettings,
-      account: savedAccount,
-    }));
-
-    setIsEditingAccount(false);
-  }
 
   async function updateSettingsSection(
     sectionName,
@@ -383,127 +300,7 @@ function Settings() {
 
               <div className="settings-content">
                 {activeSection === "account" && (
-                  <>
-                    <article className="dashboard-card settings-section">
-                      <div className="card-heading">
-                        <div>
-                          <h2>Account Information</h2>
-
-                          <p>
-                            Update your personal and contact
-                            information.
-                          </p>
-                        </div>
-
-                        {!isEditingAccount && (
-                          <button
-                            type="button"
-                            className="secondary-button"
-                            onClick={() =>
-                              setIsEditingAccount(true)
-                            }
-                          >
-                            <Pencil size={17} />
-                            Edit
-                          </button>
-                        )}
-                      </div>
-
-                      <div className="settings-form">
-                        <label>
-                          <span>Full Name</span>
-
-                          <input
-                            type="text"
-                            name="fullName"
-                            value={settings.account.fullName}
-                            disabled={!isEditingAccount}
-                            onChange={handleAccountChange}
-                            placeholder="Not provided"
-                          />
-                        </label>
-
-                        <label>
-                          <span>Email Address</span>
-
-                          <input
-                            type="email"
-                            name="email"
-                            value={settings.account.email}
-                            disabled={!isEditingAccount}
-                            onChange={handleAccountChange}
-                            placeholder="Not provided"
-                          />
-                        </label>
-
-                        <label>
-                          <span>Phone Number</span>
-
-                          <input
-                            type="tel"
-                            name="phoneNumber"
-                            value={settings.account.phoneNumber}
-                            disabled={!isEditingAccount}
-                            onChange={handleAccountChange}
-                            placeholder="Not provided"
-                          />
-                        </label>
-
-                        <label>
-                          <span>Location</span>
-
-                          <input
-                            type="text"
-                            name="location"
-                            value={settings.account.location}
-                            disabled={!isEditingAccount}
-                            onChange={handleAccountChange}
-                            placeholder="Not provided"
-                          />
-                        </label>
-
-                        <label className="form-field-full">
-                          <span>Career Field</span>
-
-                          <input
-                            type="text"
-                            name="careerField"
-                            value={settings.account.careerField}
-                            disabled={!isEditingAccount}
-                            onChange={handleAccountChange}
-                            placeholder="Not provided"
-                          />
-                        </label>
-                      </div>
-
-                      {isEditingAccount && (
-                        <div className="form-actions">
-                          <button
-                            type="button"
-                            className="secondary-button"
-                            disabled={isSavingAccount}
-                            onClick={cancelAccountEditing}
-                          >
-                            Cancel
-                          </button>
-
-                          <button
-                            type="button"
-                            className="primary-button"
-                            disabled={isSavingAccount}
-                            onClick={saveAccountInformation}
-                          >
-                            <Save size={17} />
-
-                            {isSavingAccount
-                              ? "Saving..."
-                              : "Save Changes"}
-                          </button>
-                        </div>
-                      )}
-                    </article>
-
-                    <article className="dashboard-card danger-zone">
+                    <article className="dashboard-card danger-zone settings-delete-only">
                       <div>
                         <h2>Delete Account</h2>
 
@@ -522,7 +319,6 @@ function Settings() {
                         Delete Account
                       </button>
                     </article>
-                  </>
                 )}
 
                 {activeSection === "security" && (

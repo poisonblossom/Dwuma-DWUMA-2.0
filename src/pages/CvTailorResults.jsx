@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useState } from "react";
 import { useLocation } from "wouter";
 import {
   ArrowLeft,
@@ -17,59 +17,34 @@ import {
 } from "lucide-react";
 
 import logo from "../assets/logo.svg";
+import ParsedCvResponse from "../Components/cv/ParsedCvResponse";
+import TailoringInsights from "../Components/cv/TailoringInsights";
 import "./CvTailorResults.css";
+
+function readSavedValue(key) {
+  const savedValue = sessionStorage.getItem(key);
+  if (!savedValue) return null;
+
+  try {
+    return JSON.parse(savedValue);
+  } catch {
+    sessionStorage.removeItem(key);
+    return null;
+  }
+}
 
 function CvTailorResults() {
   const [, navigate] = useLocation();
 
   const [menuOpen, setMenuOpen] = useState(false);
-  const [tailorRequest, setTailorRequest] = useState(null);
-  const [tailorResult, setTailorResult] = useState(null);
-  const [isLoadingStorage, setIsLoadingStorage] =
-    useState(true);
+  const [tailorRequest, setTailorRequest] = useState(() =>
+    readSavedValue("dwumaCvTailorRequest")
+  );
+  const [tailorResult, setTailorResult] = useState(() =>
+    readSavedValue("dwumaCvTailorResult")
+  );
+  const isLoadingStorage = false;
   const [statusMessage, setStatusMessage] = useState("");
-
-  useEffect(() => {
-    const savedRequest = sessionStorage.getItem(
-      "dwumaCvTailorRequest"
-    );
-
-    const savedResult = sessionStorage.getItem(
-      "dwumaCvTailorResult"
-    );
-
-    if (savedRequest) {
-      try {
-        setTailorRequest(JSON.parse(savedRequest));
-      } catch (error) {
-        console.error(
-          "Unable to read the CV tailor request:",
-          error
-        );
-
-        sessionStorage.removeItem(
-          "dwumaCvTailorRequest"
-        );
-      }
-    }
-
-    if (savedResult) {
-      try {
-        setTailorResult(JSON.parse(savedResult));
-      } catch (error) {
-        console.error(
-          "Unable to read the CV tailor result:",
-          error
-        );
-
-        sessionStorage.removeItem(
-          "dwumaCvTailorResult"
-        );
-      }
-    }
-
-    setIsLoadingStorage(false);
-  }, []);
 
   function closeMenu() {
     setMenuOpen(false);
@@ -121,6 +96,19 @@ function CvTailorResults() {
       "_blank",
       "noopener,noreferrer"
     );
+  }
+
+  function handleDownloadText() {
+    const content = tailorResult?.tailoredCv;
+    if (!content) return;
+
+    const file = new Blob([content], { type: "text/plain;charset=utf-8" });
+    const url = URL.createObjectURL(file);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `${tailorRequest?.fileName?.replace(/\.[^.]+$/, "") || "tailored-cv"}-tailored.txt`;
+    link.click();
+    URL.revokeObjectURL(url);
   }
 
   function renderPageContent() {
@@ -207,6 +195,7 @@ function CvTailorResults() {
     )
       ? tailorResult.improvements
       : [];
+    const isParsedCv = tailorResult.type === "parsed-cv";
 
     return (
       <>
@@ -216,16 +205,17 @@ function CvTailorResults() {
           </div>
 
           <div>
-            <h1>Your CV is Ready!</h1>
+            <h1>{isParsedCv ? "Your CV was read successfully" : "Your CV is Ready!"}</h1>
 
             <p>
-              Your uploaded CV has been successfully
-              tailored.
+              {isParsedCv
+                ? "Review the extracted content before continuing with tailoring."
+                : "Your uploaded CV has been successfully tailored."}
             </p>
           </div>
         </section>
 
-        <section className="cv-results-statistics">
+        {!isParsedCv && <section className="cv-results-statistics">
           <article className="cv-stat-card">
             <p>ATS Score</p>
 
@@ -257,24 +247,30 @@ function CvTailorResults() {
 
             <span>CV improvements</span>
           </article>
-        </section>
+        </section>}
 
         <section className="cv-results-main-grid">
           <article className="cv-preview-card">
             <div className="cv-preview-heading">
               <div>
-                <h2>Tailored CV</h2>
+                <h2>{isParsedCv ? "Extracted CV content" : "Tailored CV"}</h2>
 
                 <p>{tailorRequest.fileName}</p>
               </div>
 
               <span className="cv-preview-badge">
-                Corrected
+                {isParsedCv ? "Parsed" : "Corrected"}
               </span>
             </div>
 
             <div className="cv-preview-window">
-              {tailorResult.previewHtml ? (
+              {isParsedCv || tailorResult.type === "tailored-cv" ? (
+                <ParsedCvResponse
+                  text={isParsedCv ? tailorResult.parsedText || tailorResult.previewText : tailorResult.tailoredCv || tailorResult.previewText}
+                  fileName={tailorRequest.fileName}
+                  tailored={tailorResult.type === "tailored-cv"}
+                />
+              ) : tailorResult.previewHtml ? (
                 <div
                   className="cv-document"
                   dangerouslySetInnerHTML={{
@@ -301,14 +297,31 @@ function CvTailorResults() {
           </article>
 
           <aside className="cv-results-sidebar">
-            <article className="cv-improvements-card">
+            {tailorResult.type === "tailored-cv" ? (
+              <TailoringInsights result={tailorResult} />
+            ) : <article className="cv-improvements-card">
               <div className="cv-improvements-heading">
                 <span>✦</span>
 
-                <h2>AI Improvements</h2>
+                <h2>{isParsedCv ? "Ready for tailoring" : "AI Improvements"}</h2>
               </div>
 
-              {improvements.length > 0 ? (
+              {isParsedCv ? (
+                <div className="cv-improvements-list">
+                  <div className="cv-improvement-item">
+                    <span className="cv-improvement-check"><Check size={11} strokeWidth={3} /></span>
+                    <p>The CV text was extracted successfully.</p>
+                  </div>
+                  <div className="cv-improvement-item">
+                    <span className="cv-improvement-check"><Check size={11} strokeWidth={3} /></span>
+                    <p>{tailorRequest.jobDescription ? "Your job description is saved for the tailoring step." : "Add a job description to target a specific role."}</p>
+                  </div>
+                  <div className="cv-improvement-item">
+                    <span className="cv-improvement-check"><Check size={11} strokeWidth={3} /></span>
+                    <p>{tailorRequest.preferences?.length || 0} tailoring preferences selected.</p>
+                  </div>
+                </div>
+              ) : improvements.length > 0 ? (
                 <div className="cv-improvements-list">
                   {improvements.map(
                     (improvement, index) => (
@@ -333,10 +346,19 @@ function CvTailorResults() {
                   No improvement summary was returned.
                 </p>
               )}
-            </article>
+            </article>}
 
             <article className="cv-download-card">
-              <button
+              {tailorResult.type === "tailored-cv" && <button
+                type="button"
+                className="cv-download-button cv-download-primary"
+                onClick={handleDownloadText}
+              >
+                <Download size={17} />
+                <span>Download Tailored Text</span>
+              </button>}
+
+              {!isParsedCv && tailorResult.type !== "tailored-cv" && <><button
                 type="button"
                 className="cv-download-button cv-download-primary"
                 onClick={() => handleDownload("pdf")}
@@ -354,7 +376,7 @@ function CvTailorResults() {
                 <Download size={17} />
 
                 <span>Download DOCX</span>
-              </button>
+              </button></>}
 
               <button
                 type="button"
@@ -363,7 +385,7 @@ function CvTailorResults() {
               >
                 <RefreshCcw size={16} />
 
-                <span>Tailor Another CV</span>
+                <span>{isParsedCv ? "Analyse Another CV" : "Tailor Another CV"}</span>
               </button>
 
               {statusMessage && (

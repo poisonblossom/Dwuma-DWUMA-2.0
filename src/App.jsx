@@ -13,6 +13,7 @@ import Login from "./pages/Login";
 import CreateAccount from "./pages/CreateAccount";
 import ForgotPassword from "./pages/ForgotPassword";
 import EmailVerification from "./pages/EmailVerification";
+import EmailVerified from "./pages/EmailVerified";
 import Dashboard from "./pages/Dashboard";
 import CareerPreferences from "./pages/CareerPreferences";
 import OnboardingStepTwo from "./pages/OnboardingStepTwo";
@@ -72,6 +73,11 @@ function App() {
       <Route
         path="/email-verification"
         component={EmailVerification}
+      />
+
+      <Route
+        path="/email-verified"
+        component={EmailVerified}
       />
 
       {/* Onboarding */}

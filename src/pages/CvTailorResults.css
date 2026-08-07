@@ -390,6 +390,120 @@ input {
   white-space: pre-wrap;
 }
 
+.parsed-cv-response {
+  width: min(100%, 720px);
+  margin: 0 auto;
+}
+
+.parsed-cv-response-summary {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 12px;
+  padding: 13px 15px;
+  background: #ffffff;
+  border: 1px solid #e2e2e2;
+  border-radius: 8px;
+}
+
+.parsed-cv-response-status {
+  min-width: 0;
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  color: #268247;
+}
+
+.parsed-cv-response-status > div {
+  min-width: 0;
+}
+
+.parsed-cv-response-status strong,
+.parsed-cv-response-status span {
+  display: block;
+}
+
+.parsed-cv-response-status strong {
+  color: #323232;
+  font-size: 10px;
+}
+
+.parsed-cv-response-status span {
+  margin-top: 3px;
+  overflow: hidden;
+  color: #7b7b7b;
+  font-size: 8px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.parsed-cv-response-metrics {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.parsed-cv-response-metrics span {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: #817173;
+  font-size: 8px;
+  white-space: nowrap;
+}
+
+.parsed-cv-response-metrics svg,
+.parsed-cv-response-metrics strong {
+  color: #980b10;
+}
+
+.parsed-cv-document {
+  padding: 33px 38px;
+  color: #262626;
+  background: #ffffff;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.12);
+  font-family: Arial, sans-serif;
+}
+
+.parsed-cv-section + .parsed-cv-section {
+  margin-top: 24px;
+}
+
+.parsed-cv-section h3 {
+  margin: 0 0 8px;
+  padding-bottom: 5px;
+  color: #85090d;
+  border-bottom: 1px solid #d7b9bb;
+  font-size: 11px;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+}
+
+.parsed-cv-section:first-child h3 {
+  color: #333333;
+  border-bottom: 2px solid #85090d;
+  font-size: 13px;
+}
+
+.parsed-cv-section p {
+  margin: 0;
+  color: #373737;
+  font-size: 10px;
+  line-height: 1.75;
+  white-space: pre-wrap;
+}
+
+.parsed-cv-response-note {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 6px;
+  margin: 11px 0 0;
+  color: #7d6b6c;
+  font-size: 8px;
+}
+
 .cv-preview-placeholder {
   min-height: 430px;
   display: flex;
@@ -423,6 +537,111 @@ input {
 
 .cv-improvements-card {
   padding: 17px;
+}
+
+.tailoring-insights-card {
+  padding: 17px;
+  background: #ffffff;
+  border-radius: 11px;
+  box-shadow: 0 10px 22px rgba(35, 0, 0, 0.16);
+}
+
+.tailoring-insights-card .cv-improvements-heading > svg {
+  color: #9f080c;
+}
+
+.tailoring-ats-summary {
+  margin-top: 14px;
+  padding: 13px;
+  background: #fff6f6;
+  border: 1px solid #eed8d9;
+  border-radius: 8px;
+}
+
+.tailoring-ats-summary strong,
+.tailoring-keyword-group h3,
+.tailoring-changelog h3 {
+  color: #5b3c3e;
+  font-size: 9px;
+}
+
+.tailoring-ats-summary p,
+.tailoring-keyword-group > p {
+  margin: 7px 0 0;
+  color: #786567;
+  font-size: 9px;
+  line-height: 1.65;
+}
+
+.tailoring-keyword-group,
+.tailoring-changelog {
+  margin-top: 16px;
+}
+
+.tailoring-keyword-group h3,
+.tailoring-changelog h3 {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin: 0;
+}
+
+.tailoring-keywords {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin-top: 9px;
+}
+
+.tailoring-keywords span {
+  padding: 5px 7px;
+  border-radius: 999px;
+  font-size: 8px;
+  font-weight: 700;
+}
+
+.tailoring-keywords-matched span {
+  color: #237342;
+  background: #e8f6ed;
+}
+
+.tailoring-keywords-missing span {
+  color: #965d10;
+  background: #fff1d7;
+}
+
+.tailoring-change {
+  display: flex;
+  align-items: flex-start;
+  gap: 9px;
+  padding: 11px 0;
+  border-bottom: 1px solid #eee4e4;
+}
+
+.tailoring-change:last-child {
+  border-bottom: 0;
+}
+
+.tailoring-change > span {
+  padding: 4px 6px;
+  color: #940a0f;
+  background: #fae8e9;
+  border-radius: 5px;
+  font-size: 7px;
+  font-weight: 800;
+  text-transform: uppercase;
+}
+
+.tailoring-change strong {
+  color: #49383a;
+  font-size: 9px;
+}
+
+.tailoring-change p {
+  margin: 4px 0 0;
+  color: #7b696a;
+  font-size: 8px;
+  line-height: 1.55;
 }
 
 .cv-improvements-heading {

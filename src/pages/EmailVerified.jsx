@@ -1,7 +1,10 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, useLocation } from "wouter";
 import logo from "../assets/logo.svg";
 import "./EmailVerification.css";
+
+const API_BASE_URL =
+  import.meta.env.VITE_API_BASE_URL || "https://dwuma-api.onrender.com/api";
 
 const confettiPieces = Array.from({ length: 45 }, (_, index) => ({
   id: index,
@@ -12,8 +15,8 @@ const confettiPieces = Array.from({ length: 45 }, (_, index) => ({
 }));
 
 function EmailVerified() {
-  const navigate = useNavigate();
-  const [searchParams] = useSearchParams();
+  const [, navigate] = useLocation();
+  const searchParams = new URLSearchParams(window.location.search);
 
   const [verificationStatus, setVerificationStatus] =
     useState("verifying");
@@ -30,7 +33,7 @@ function EmailVerified() {
 
       try {
         const response = await fetch(
-          "https://localhost:7000/api/auth/verify-email",
+          `${API_BASE_URL}/auth/verify-email`,
           {
             method: "POST",
             headers: {
@@ -51,12 +54,7 @@ function EmailVerified() {
         setVerificationStatus("success");
       } catch (error) {
         console.error(error);
-
-        /*
-          Temporary demo:
-          Remove this fallback after your backend verification endpoint works.
-        */
-        setVerificationStatus("success");
+        setVerificationStatus("failed");
       }
     };
 
@@ -101,7 +99,7 @@ function EmailVerified() {
           </p>
 
           <Link
-            to="/email-verification"
+            href="/email-verification"
             className="verification-primary-link"
           >
             Request another link
@@ -130,7 +128,7 @@ function EmailVerified() {
         ))}
       </div>
 
-      <Link to="/" className="verification-logo-link">
+      <Link href="/" className="verification-logo-link">
         <img
           src={logo}
           alt="Dwuma logo"
@@ -154,7 +152,7 @@ function EmailVerified() {
           your dashboard.
         </p>
 
-        <Link to="/login" className="verification-primary-link">
+        <Link href="/login" className="verification-primary-link">
           Continue to login
         </Link>
       </section>

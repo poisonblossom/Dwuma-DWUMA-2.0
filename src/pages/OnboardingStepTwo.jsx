@@ -4,6 +4,25 @@ import "./CareerPreferences.css";
 
 const JOB_FORMS = ["Hybrid", "Remote", "Onsite"];
 
+const GHANA_LOCATIONS = {
+  "Ahafo": ["Bechem", "Duayaw Nkwanta", "Goaso", "Hwidiem", "Kenyasi"],
+  "Ashanti": ["Bekwai", "Ejisu", "Konongo", "Kumasi", "Mampong", "Obuasi"],
+  "Bono": ["Berekum", "Dormaa Ahenkro", "Sunyani", "Wenchi"],
+  "Bono East": ["Atebubu", "Kintampo", "Nkoranza", "Techiman"],
+  "Central": ["Agona Swedru", "Cape Coast", "Kasoa", "Mankessim", "Winneba"],
+  "Eastern": ["Aburi", "Akosombo", "Koforidua", "Kyebi", "Nkawkaw", "Suhum"],
+  "Greater Accra": ["Accra", "Adenta", "Ashaiman", "Madina", "Tema", "Teshie"],
+  "North East": ["Bunkpurugu", "Gambaga", "Nalerigu", "Walewale"],
+  "Northern": ["Savelugu", "Tamale", "Yendi"],
+  "Oti": ["Dambai", "Jasikan", "Kadjebi", "Nkwanta"],
+  "Savannah": ["Bole", "Damongo", "Salaga", "Sawla"],
+  "Upper East": ["Bawku", "Bolgatanga", "Navrongo", "Paga"],
+  "Upper West": ["Jirapa", "Lawra", "Nandom", "Tumu", "Wa"],
+  "Volta": ["Aflao", "Ho", "Hohoe", "Keta", "Kpando"],
+  "Western": ["Axim", "Sekondi", "Takoradi", "Tarkwa"],
+  "Western North": ["Bibiani", "Enchi", "Juaboso", "Sefwi Wiawso"],
+};
+
 const WORK_FIELDS = [
   "Accounting and Finance",
   "Administration",
@@ -32,35 +51,68 @@ const WORK_FIELDS = [
 
 const AVAILABLE_SKILLS = [
   "Accounting",
+  "Adaptability",
   "Adobe Illustrator",
   "Adobe Photoshop",
+  "Agile Methodologies",
+  "Amazon Web Services (AWS)",
+  "Analytical Thinking",
   "Auditing",
+  "AutoCAD",
+  "Bash",
   "Business Analysis",
+  "C#",
+  "C++",
   "Cloud Computing",
   "Communication",
+  "Conflict Resolution",
   "Content Creation",
+  "Critical Thinking",
+  "CSS",
   "Customer Service",
   "Cybersecurity",
   "Data Analysis",
+  "Data Entry",
+  "Database Management",
   "Digital Marketing",
+  "Docker",
+  "Figma",
   "Financial Reporting",
+  "Git and GitHub",
+  "Google Workspace",
   "Graphic Design",
+  "HTML",
+  "Interpersonal Skills",
   "Java",
   "JavaScript",
   "Leadership",
+  "Linux",
+  "Machine Learning",
   "Microsoft Excel",
   "Microsoft Office",
+  "Microsoft Power BI",
+  "Mobile App Development",
   "Networking",
+  "Node.js",
+  "PHP",
+  "Presentation Skills",
   "Problem Solving",
   "Project Management",
   "Python",
   "React",
+  "Research",
   "Sales",
+  "SEO",
   "Social Media Management",
   "SQL",
+  "Strategic Thinking",
   "Teamwork",
+  "Time Management",
+  "TypeScript",
   "UI/UX Design",
+  "Verbal Communication",
   "Web Development",
+  "Written Communication",
 ];
 
 function OnboardingStepTwo() {
@@ -69,15 +121,18 @@ function OnboardingStepTwo() {
   const [formData, setFormData] = useState({
     jobForm: "",
     fieldOfWork: "",
+    region: "",
+    city: "",
     skills: [],
   });
 
-  const [skillsOpen, setSkillsOpen] = useState(false);
   const [errorMessage, setErrorMessage] = useState("");
 
   const isFormComplete =
     formData.jobForm !== "" &&
     formData.fieldOfWork !== "" &&
+    formData.region !== "" &&
+    formData.city !== "" &&
     formData.skills.length > 0;
 
   function selectJobForm(jobForm) {
@@ -98,20 +153,32 @@ function OnboardingStepTwo() {
     setErrorMessage("");
   }
 
-  function toggleSkill(skill) {
-    setFormData((currentData) => {
-      const skillIsSelected = currentData.skills.includes(skill);
+  function handleRegionChange(event) {
+    setFormData((currentData) => ({
+      ...currentData,
+      region: event.target.value,
+      city: "",
+    }));
+    setErrorMessage("");
+  }
 
-      return {
-        ...currentData,
-        skills: skillIsSelected
-          ? currentData.skills.filter(
-              (selectedSkill) => selectedSkill !== skill
-            )
-          : [...currentData.skills, skill],
-      };
-    });
+  function handleCityChange(event) {
+    setFormData((currentData) => ({
+      ...currentData,
+      city: event.target.value,
+    }));
+    setErrorMessage("");
+  }
 
+  function handleSkillSelect(event) {
+    const skill = event.target.value;
+    if (!skill) return;
+    setFormData((currentData) => ({
+      ...currentData,
+      skills: currentData.skills.includes(skill)
+        ? currentData.skills
+        : [...currentData.skills, skill],
+    }));
     setErrorMessage("");
   }
 
@@ -129,7 +196,7 @@ function OnboardingStepTwo() {
 
     if (!isFormComplete) {
       setErrorMessage(
-        "Please select your job form, field of work and at least one skill."
+        "Please select your job form, field of work, region, city and at least one skill."
       );
       return;
     }
@@ -151,6 +218,7 @@ function OnboardingStepTwo() {
     const completeOnboardingData = {
       ...stepOneData,
       ...formData,
+      location: `${formData.city}, ${formData.region}`,
     };
 
     localStorage.setItem(
@@ -159,8 +227,13 @@ function OnboardingStepTwo() {
     );
 
     localStorage.setItem("isOnboarded", "true");
+    sessionStorage.removeItem("dwumaPendingOnboarding");
 
-    navigate("/dashboard");
+    const token =
+      localStorage.getItem("dwumaToken") ||
+      sessionStorage.getItem("dwumaToken");
+
+    navigate(token ? "/dashboard" : "/login");
   }
 
   function goBack() {
@@ -241,58 +314,35 @@ function OnboardingStepTwo() {
             </div>
           </div>
 
-          <div className="career-field skills-field">
-            <label id="skills-label">Skills</label>
-
-            <button
-              type="button"
-              className={`skills-select-button ${
-                skillsOpen ? "skills-select-button-open" : ""
-              }`}
-              onClick={() => setSkillsOpen((current) => !current)}
-              aria-expanded={skillsOpen}
-              aria-labelledby="skills-label"
-            >
-              <span>
-                {formData.skills.length === 0
-                  ? "Select your skills"
-                  : `${formData.skills.length} skill${
-                      formData.skills.length > 1 ? "s" : ""
-                    } selected`}
-              </span>
-
-              <span
-                className={`skills-arrow ${
-                  skillsOpen ? "skills-arrow-open" : ""
-                }`}
-              >
-               ⌄
-              </span>
-            </button>
-
-            {skillsOpen && (
-              <div className="skills-dropdown">
-                {AVAILABLE_SKILLS.map((skill) => {
-                  const isSelected =
-                    formData.skills.includes(skill);
-
-                  return (
-                    <label
-                      key={skill}
-                      className="skill-checkbox-option"
-                    >
-                      <input
-                        type="checkbox"
-                        checked={isSelected}
-                        onChange={() => toggleSkill(skill)}
-                      />
-
-                      <span>{skill}</span>
-                    </label>
-                  );
-                })}
+          <div className="onboarding-location-grid">
+            <div className="career-field">
+              <label htmlFor="region">Region</label>
+              <div className="select-wrapper">
+                <select id="region" name="region" value={formData.region} onChange={handleRegionChange} required>
+                  <option value="" disabled>Select your region</option>
+                  {Object.keys(GHANA_LOCATIONS).map((region) => <option key={region} value={region}>{region}</option>)}
+                </select>
               </div>
-            )}
+            </div>
+
+            <div className="career-field">
+              <label htmlFor="city">City or town</label>
+              <input id="city" name="city" value={formData.city} onChange={handleCityChange} disabled={!formData.region} placeholder={formData.region ? "Enter your city or town" : "Select a region first"} required />
+            </div>
+          </div>
+
+          <div className="career-field skills-field">
+            <label htmlFor="skills">Skills</label>
+            <div className="select-wrapper">
+              <select id="skills" value="" onChange={handleSkillSelect}>
+                <option value="">Select a skill to add</option>
+                {AVAILABLE_SKILLS.map((skill) => (
+                  <option key={skill} value={skill} disabled={formData.skills.includes(skill)}>
+                    {skill}
+                  </option>
+                ))}
+              </select>
+            </div>
 
             {formData.skills.length > 0 && (
               <div className="selected-skills">

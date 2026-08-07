@@ -6,6 +6,7 @@ import {
   Check,
   FileText,
   LayoutDashboard,
+  LoaderCircle,
   Menu,
   Settings,
   Upload,
@@ -15,6 +16,7 @@ import {
 } from "lucide-react";
 
 import logo from "../assets/logo.svg";
+import { parseCv, tailorCv } from "../Components/services/cvTailorService";
 import "./CvTailor.css";
 
 const tailoringOptions = [
@@ -74,8 +76,12 @@ function CvTailor() {
   const [menuOpen, setMenuOpen] = useState(false);
   const [selectedFile, setSelectedFile] = useState(null);
   const [jobDescription, setJobDescription] = useState("");
+  const [jobTitle, setJobTitle] = useState("");
+  const [companyName, setCompanyName] = useState("");
+  const [tailoringFocus, setTailoringFocus] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const [selectedOptions, setSelectedOptions] =
     useState(createDefaultOptions);
 
@@ -167,6 +173,9 @@ function CvTailor() {
   function resetCvTailor() {
     setSelectedFile(null);
     setJobDescription("");
+    setJobTitle("");
+    setCompanyName("");
+    setTailoringFocus("");
     setSelectedOptions(createDefaultOptions());
     setStatusMessage("");
 
@@ -179,7 +188,7 @@ function CvTailor() {
     );
   }
 
-  function handleTailorCv() {
+  async function handleTailorCv() {
     if (!selectedFile) {
       setStatusMessage(
         "Upload your CV before tailoring it."
@@ -202,11 +211,27 @@ function CvTailor() {
       return;
     }
 
+    if (!jobTitle.trim() || !jobDescription.trim()) {
+      setStatusMessage(
+        "Add the target job title and job description before tailoring your CV."
+      );
+      return;
+    }
+
+    const selectedFocusLabels = tailoringOptions
+      .filter((option) => enabledOptions.includes(option.id))
+      .map((option) => option.label);
+    const resolvedTailoringFocus =
+      tailoringFocus.trim() || selectedFocusLabels.join(", ");
+
     const cvTailorRequest = {
       fileName: selectedFile.name,
       fileSize: selectedFile.size,
       fileType: selectedFile.type,
+      jobTitle: jobTitle.trim(),
+      companyName: companyName.trim(),
       jobDescription: jobDescription.trim(),
+      tailoringFocus: resolvedTailoringFocus,
       preferences: enabledOptions,
       submittedAt: new Date().toISOString(),
     };
@@ -222,55 +247,41 @@ function CvTailor() {
       JSON.stringify(cvTailorRequest)
     );
 
-    sessionStorage.removeItem(
-      "dwumaCvTailorResult"
-    );
-
-    console.log("CV tailor request:", {
-      file: selectedFile,
-      ...cvTailorRequest,
-    });
-
-    /*
-      Add the backend connection later:
-
-      const formData = new FormData();
-
-      formData.append("cv", selectedFile);
-      formData.append(
-        "jobDescription",
-        jobDescription.trim()
-      );
-      formData.append(
-        "preferences",
-        JSON.stringify(enabledOptions)
-      );
-
-      const response = await fetch(
-        `${API_BASE_URL}/cv-tailor/upload`,
-        {
-          method: "POST",
-          body: formData,
-        }
-      );
-
-      if (!response.ok) {
-        throw new Error(
-          "Unable to tailor the uploaded CV."
-        );
-      }
-
-      const result = await response.json();
-
-      sessionStorage.setItem(
-        "dwumaCvTailorResult",
-        JSON.stringify(result)
-      );
-    */
-
+    sessionStorage.removeItem("dwumaCvTailorResult");
+    setIsSubmitting(true);
     setStatusMessage("");
 
-    navigate("/dashboard/cv-tailor/results");
+    try {
+      const parsedResult = await parseCv(selectedFile);
+      const result = await tailorCv({
+        cvText: parsedResult.text,
+        jobTitle: jobTitle.trim(),
+        jobDescription: jobDescription.trim(),
+        companyName: companyName.trim(),
+        tailoringFocus: resolvedTailoringFocus,
+      });
+      sessionStorage.setItem(
+        "dwumaCvTailorResult",
+        JSON.stringify({
+          type: "tailored-cv",
+          parsedText: parsedResult.text,
+          previewText: result.tailoredCv,
+          tailoredCv: result.tailoredCv,
+          atsScore: result.atsScore,
+          atsSummary: result.atsSummary,
+          matchedKeywords: result.matchedKeywords || [],
+          missingKeywords: result.missingKeywords || [],
+          changelog: result.changelog || [],
+          changesMade: result.changelog?.length || 0,
+          improvements: (result.changelog || []).map((change) => change.reason),
+        })
+      );
+      navigate("/dashboard/cv-tailor/results");
+    } catch (error) {
+      setStatusMessage(error.message);
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   return (
@@ -505,6 +516,27 @@ function CvTailor() {
                 </div>
               </div>
 
+              <div className="cv-target-fields">
+                <label>
+                  Target job title *
+                  <input
+                    value={jobTitle}
+                    onChange={(event) => setJobTitle(event.target.value.slice(0, 120))}
+                    placeholder="e.g. Junior DevOps Engineer"
+                    maxLength={120}
+                  />
+                </label>
+                <label>
+                  Company
+                  <input
+                    value={companyName}
+                    onChange={(event) => setCompanyName(event.target.value.slice(0, 120))}
+                    placeholder="e.g. Google"
+                    maxLength={120}
+                  />
+                </label>
+              </div>
+
               <textarea
                 value={jobDescription}
                 onChange={(event) =>
@@ -519,6 +551,17 @@ function CvTailor() {
               <span className="cv-character-count">
                 {jobDescription.length}/2000 characters
               </span>
+
+              <label className="cv-tailoring-focus-label">
+                Tailoring focus
+                <textarea
+                  className="cv-tailoring-focus"
+                  value={tailoringFocus}
+                  onChange={(event) => setTailoringFocus(event.target.value.slice(0, 500))}
+                  placeholder="Optional: describe what you most want the tailored CV to emphasize."
+                  maxLength={500}
+                />
+              </label>
             </section>
 
             <section className="cv-tailor-card">
@@ -596,6 +639,7 @@ function CvTailor() {
               type="button"
               className="cv-tailor-reset-button"
               onClick={resetCvTailor}
+              disabled={isSubmitting}
             >
               Clear
             </button>
@@ -604,8 +648,11 @@ function CvTailor() {
               type="button"
               className="cv-tailor-submit-button"
               onClick={handleTailorCv}
+              disabled={isSubmitting}
             >
-              Tailor My CV
+              {isSubmitting ? (
+                <><LoaderCircle className="cv-tailor-spinner" size={17} />Parsing and tailoring...</>
+              ) : "Tailor My CV"}
             </button>
           </div>
         </div>

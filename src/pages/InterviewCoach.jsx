@@ -162,6 +162,7 @@ function InterviewCoach() {
 
   async function submitAnswer(event) {
     event.preventDefault();
+    if (feedback) return;
     const cleanAnswer = answer.trim();
     if (cleanAnswer.length < 10) {
       setError("Give your coach a little more detail before submitting.");
@@ -191,12 +192,24 @@ function InterviewCoach() {
     }
   }
 
-  function nextQuestion() {
-    setAnswer("");
-    setFeedback(null);
+  function goToQuestion(index) {
+    const reviewedAnswer = answers[index];
+    setCurrentIndex(index);
+    setAnswer(reviewedAnswer?.answer || "");
+    setFeedback(reviewedAnswer?.feedback || null);
     setError("");
-    if (currentIndex + 1 >= questions.length) setPhase("complete");
-    else setCurrentIndex((index) => index + 1);
+  }
+
+  function previousQuestion() {
+    if (currentIndex > 0) goToQuestion(currentIndex - 1);
+  }
+
+  function nextQuestion() {
+    if (currentIndex + 1 >= questions.length) {
+      setPhase("complete");
+      return;
+    }
+    goToQuestion(currentIndex + 1);
   }
 
   function resetInterview() {
@@ -245,7 +258,7 @@ function InterviewCoach() {
 
   function renderFeedback() {
     return (
-      <section className="coach-feedback" aria-live="polite">
+      <aside className="coach-feedback" aria-live="polite">
         <div className="coach-feedback-summary"><ScoreRing score={feedback.score} /><div><span className="coach-eyebrow"><CheckCircle2 size={14} /> Answer reviewed</span><h2>{feedback.overallAssessment}</h2></div></div>
         <div className="coach-feedback-grid">
           <div className="coach-feedback-card coach-strengths"><h3><CheckCircle2 /> What worked</h3><ul>{(feedback.strengths || []).map((item) => <li key={item}>{item}</li>)}</ul></div>
@@ -253,8 +266,7 @@ function InterviewCoach() {
         </div>
         {feedback.improvedAnswer && <div className="coach-model-answer"><h3><Sparkles /> A stronger answer</h3><p>{feedback.improvedAnswer}</p></div>}
         {feedback.deliveryTip && <div className="coach-delivery-tip"><Lightbulb /><div><strong>Delivery tip</strong><p>{feedback.deliveryTip}</p></div></div>}
-        <button className="coach-primary-button coach-next-button" onClick={nextQuestion}>{currentIndex + 1 === questions.length ? <>View session results<Trophy size={17} /></> : <>Next question<ChevronRight size={18} /></>}</button>
-      </section>
+      </aside>
     );
   }
 
@@ -268,18 +280,26 @@ function InterviewCoach() {
           <span className="coach-progress-label">{currentIndex + 1} of {questions.length}</span>
         </div>
         <div className="coach-progress-track"><span style={{ width: `${progress}%` }} /></div>
-        {!feedback ? <section className="coach-question-card">
-          <div className="coach-question-meta"><span className={`coach-category coach-category-${currentQuestion.category}`}>{currentQuestion.category || "general"}</span><span>{currentQuestion.difficulty || "practice"}</span></div>
-          <p className="coach-question-number">Question {currentIndex + 1}</p>
-          <h2>{currentQuestion.question}</h2>
-          {currentQuestion.whatInterviewerLooksFor && <details><summary><Lightbulb size={15} />What the interviewer is looking for</summary><p>{currentQuestion.whatInterviewerLooksFor}</p></details>}
-          <form onSubmit={submitAnswer} className="coach-answer-form">
-            <label htmlFor="interview-answer">Your answer</label>
-            <textarea id="interview-answer" value={answer} onChange={(event) => { setAnswer(event.target.value); setError(""); }} maxLength={MAX_ANSWER_LENGTH} rows="8" placeholder="Structure your thinking, give a specific example, and explain the outcome..." autoFocus />
-            <div className="coach-answer-footer"><span>{answer.length.toLocaleString()} / {MAX_ANSWER_LENGTH.toLocaleString()}</span><button className="coach-primary-button" disabled={loading || answer.trim().length < 10}>{loading ? <><LoaderCircle className="coach-spinner" />Reviewing...</> : <>Get feedback<ArrowRight size={17} /></>}</button></div>
-            {error && <p className="coach-error" role="alert"><CircleAlert size={16} />{error}</p>}
-          </form>
-        </section> : renderFeedback()}
+        <div className="coach-interview-workspace">
+          <section className="coach-question-card">
+            <div className="coach-question-meta"><span className={`coach-category coach-category-${currentQuestion.category}`}>{currentQuestion.category || "general"}</span><span>{currentQuestion.difficulty || "practice"}</span></div>
+            <p className="coach-question-number">Question {currentIndex + 1}</p>
+            <h2>{currentQuestion.question}</h2>
+            {currentQuestion.whatInterviewerLooksFor && <details><summary><Lightbulb size={15} />What the interviewer is looking for</summary><p>{currentQuestion.whatInterviewerLooksFor}</p></details>}
+            <form onSubmit={submitAnswer} className="coach-answer-form">
+              <label htmlFor="interview-answer">{feedback ? "Your submitted answer" : "Your answer"}</label>
+              <textarea id="interview-answer" value={answer} onChange={(event) => { setAnswer(event.target.value); setError(""); }} maxLength={MAX_ANSWER_LENGTH} rows="8" placeholder="Structure your thinking, give a specific example, and explain the outcome..." autoFocus={!feedback} readOnly={Boolean(feedback)} />
+              {!feedback && <div className="coach-answer-footer"><span>{answer.length.toLocaleString()} / {MAX_ANSWER_LENGTH.toLocaleString()}</span><button className="coach-primary-button" disabled={loading || answer.trim().length < 10}>{loading ? <><LoaderCircle className="coach-spinner" />Reviewing...</> : <>Get feedback<ArrowRight size={17} /></>}</button></div>}
+              {error && <p className="coach-error" role="alert"><CircleAlert size={16} />{error}</p>}
+            </form>
+          </section>
+          {feedback ? renderFeedback() : <aside className="coach-remarks-empty"><div><Sparkles /></div><span className="coach-eyebrow">AI remarks</span><h2>Your feedback will appear here</h2><p>Submit your answer to receive a score, focused coaching points, a stronger example, and a delivery tip.</p></aside>}
+        </div>
+        <nav className="coach-question-navigation" aria-label="Interview question navigation">
+          <button className="coach-secondary-button" onClick={previousQuestion} disabled={currentIndex === 0}><ArrowLeft size={16} />Previous question</button>
+          <div className="coach-question-dots">{questions.map((question, index) => <button key={question.number || index} className={index === currentIndex ? "coach-dot-active" : index < answers.length ? "coach-dot-complete" : ""} onClick={() => index <= answers.length && goToQuestion(index)} disabled={index > answers.length} aria-label={`Go to question ${index + 1}`} aria-current={index === currentIndex ? "step" : undefined}>{index + 1}</button>)}</div>
+          <button className="coach-primary-button" onClick={nextQuestion} disabled={!feedback}>{currentIndex + 1 === questions.length ? <>View results<Trophy size={17} /></> : <>Next question<ChevronRight size={18} /></>}</button>
+        </nav>
       </div>
     );
   }

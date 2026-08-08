@@ -1,6 +1,8 @@
 const API_BASE_URL = (
   import.meta.env.VITE_API_BASE_URL || "https://dwuma-api.onrender.com/api"
 ).replace(/\/$/, "");
+const LATEST_INTERVIEW_KEY = "dwumaLatestInterview";
+const ACTIVE_INTERVIEW_KEY = "dwumaInterviewInProgress";
 
 function getToken() {
   return (
@@ -68,4 +70,30 @@ export function completeInterview(sessionId) {
 
 export function getLatestInterview() {
   return requestInterview("latest");
+}
+
+export function clearCachedInterviewResult() {
+  localStorage.removeItem(LATEST_INTERVIEW_KEY);
+  localStorage.setItem(ACTIVE_INTERVIEW_KEY, "true");
+}
+
+export function cacheCompletedInterview(result) {
+  if (!result?.completed || typeof result?.score !== "number") return;
+  localStorage.setItem(LATEST_INTERVIEW_KEY, JSON.stringify(result));
+  localStorage.removeItem(ACTIVE_INTERVIEW_KEY);
+}
+
+export function getCachedInterviewResult() {
+  if (localStorage.getItem(ACTIVE_INTERVIEW_KEY) === "true") return null;
+  try {
+    const result = JSON.parse(localStorage.getItem(LATEST_INTERVIEW_KEY) || "null");
+    return result?.completed && typeof result?.score === "number" ? result : null;
+  } catch {
+    localStorage.removeItem(LATEST_INTERVIEW_KEY);
+    return null;
+  }
+}
+
+export function hasActiveInterview() {
+  return localStorage.getItem(ACTIVE_INTERVIEW_KEY) === "true";
 }

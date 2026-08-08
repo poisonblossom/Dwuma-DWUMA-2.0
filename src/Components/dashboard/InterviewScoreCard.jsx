@@ -41,7 +41,7 @@ function InterviewScoreCard({ interview }) {
                 <strong>
                   {interview.score}%
                 </strong>
-                <span>Your score</span>
+                <span>Final score</span>
               </div>
             </div>
 
@@ -53,7 +53,7 @@ function InterviewScoreCard({ interview }) {
 
               <p>
                 {interview.feedback ??
-                  "Your interview feedback will appear here."}
+                  "Final cumulative evaluation from your completed interview."}
               </p>
             </div>
           </>

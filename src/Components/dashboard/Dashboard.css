@@ -576,9 +576,8 @@ button {
   flex-shrink: 0;
 
   background: conic-gradient(
-    #a90e13 0deg 210deg,
-    #e34e54 210deg 295deg,
-    #f3a0a4 295deg 360deg
+    #a90e13 0deg var(--match-score, 0deg),
+    #f3d9da var(--match-score, 0deg) 360deg
   );
 
   border-radius: 50%;
@@ -700,6 +699,7 @@ button {
 
   font-size: 8px;
   text-align: center;
+  line-height: 1.5;
 }
 
 /* =========================

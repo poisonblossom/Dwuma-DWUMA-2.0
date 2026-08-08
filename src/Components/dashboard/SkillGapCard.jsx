@@ -1,8 +1,11 @@
 import { MoreHorizontal } from "lucide-react";
 
-function SkillGapCard({ skills = [] }) {
-  const hasSkills = Array.isArray(skills) &&
-    skills.length > 0;
+function SkillGapCard({ analysis, loading = false, error = "" }) {
+  const gaps = Array.isArray(analysis?.skills)
+    ? analysis.skills.filter((skill) => ["partial", "absent"].includes(skill.status?.toLowerCase()))
+    : [];
+  const score = Math.max(0, Math.min(100, Number(analysis?.matchPercentage) || 0));
+  const hasAnalysis = Boolean(analysis);
 
   return (
     <article className="dashboard-card skill-card">
@@ -17,29 +20,33 @@ function SkillGapCard({ skills = [] }) {
         </button>
       </div>
 
-      {hasSkills ? (
+      {loading ? (
+        <div className="dashboard-empty-state" aria-live="polite">
+          <div className="empty-donut"><span>...</span></div>
+          <div><h3>Analysing your skills</h3><p>Comparing your saved skills with your field and desired role.</p></div>
+        </div>
+      ) : hasAnalysis ? (
         <div className="skill-card-content">
-          <div className="skill-chart">
+          <div className="skill-chart" style={{ "--match-score": `${score * 3.6}deg` }}>
             <div className="skill-chart-centre">
-              <strong>
-                {skills[0]?.percentage ?? 0}%
-              </strong>
-              <span>Overall</span>
+              <strong>{score}%</strong>
+              <span>Role match</span>
             </div>
           </div>
 
           <div className="skill-list">
-            {skills.slice(0, 3).map((skill) => (
+            {gaps.slice(0, 4).map((skill) => (
               <div
                 className="skill-list-item"
-                key={skill.id ?? skill.name}
+                key={skill.name}
+                title={skill.description}
               >
                 <span className="skill-colour" />
 
                 <p>{skill.name}</p>
 
                 <strong>
-                  {skill.percentage ?? 0}%
+                  {skill.status === "partial" ? "Developing" : "Missing"}
                 </strong>
               </div>
             ))}
@@ -51,20 +58,14 @@ function SkillGapCard({ skills = [] }) {
             <span>—</span>
           </div>
 
-          <div>
-            <h3>No skills analysis yet</h3>
-            <p>
-              Your relevant skills and market gaps
-              will appear here after your profile is
-              analysed.
-            </p>
-          </div>
+          <div><h3>Analysis unavailable</h3><p>{error || "Your saved onboarding analysis could not be loaded."}</p></div>
         </div>
       )}
 
       <p className="skill-card-caption">
-        Relevant skills in your selected career field
-        will appear here.
+        {hasAnalysis
+          ? (gaps.length ? analysis.summary : "No missing skills were identified for your selected role.")
+          : "Skill gaps are based on your saved onboarding information."}
       </p>
     </article>
   );

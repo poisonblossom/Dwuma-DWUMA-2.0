@@ -20,6 +20,8 @@ import {
   evaluateInterviewAnswer,
   generateInterviewQuestions,
   completeInterview,
+  cacheCompletedInterview,
+  clearCachedInterviewResult,
 } from "../Components/services/interviewService";
 import "../Components/dashboard/Dashboard.css";
 import "./InterviewCoach.css";
@@ -144,6 +146,7 @@ function InterviewCoach() {
         companyName: result.companyName || setup.companyName,
       };
       setSetup(nextSetup);
+      clearCachedInterviewResult();
       setQuestions(result.questions);
       setSessionId(result.sessionId);
       setAnswers([]);
@@ -217,7 +220,17 @@ function InterviewCoach() {
       setLoading(true);
       setError("");
       try {
-        await completeInterview(sessionId);
+        const completion = await completeInterview(sessionId);
+        const finalResult = {
+          ...completion,
+          completed: true,
+          score: Number(completion?.score ?? averageScore),
+          role: setup.jobTitle,
+          company: setup.companyName,
+          message: `${setup.jobTitle} interview completed`,
+          feedback: `Final evaluation based on all ${answers.length} interview questions.`,
+        };
+        cacheCompletedInterview(finalResult);
         setPhase("complete");
       } catch (requestError) {
         setError(requestError.message);

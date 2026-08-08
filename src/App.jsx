@@ -24,6 +24,7 @@ import Profile from "./pages/Profile";
 import Notifications from "./pages/Notifications";
 import Settings from "./pages/Settings";
 import Jobs from "./pages/Jobs";
+import JobDetails from "./pages/JobDetails";
 
 function LandingPage() {
   return (
@@ -105,6 +106,11 @@ function App() {
       <Route
         path="/dashboard/cv-tailor/results"
         component={CvTailorResults}
+      />
+
+      <Route
+        path="/dashboard/jobs/:id"
+        component={JobDetails}
       />
 
       <Route

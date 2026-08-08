@@ -169,6 +169,18 @@ function CreateAccount() {
       // if redponse is okay store isOnboarded as false in localStorage
       if (response.ok) {
         localStorage.setItem("isOnboarded", "false");
+        localStorage.removeItem("dwumaOnboardingData");
+        localStorage.removeItem("dwumaCareerPreferences");
+
+        const registrationToken = data?.token || data?.accessToken || data?.jwtToken;
+        if (registrationToken) {
+          sessionStorage.setItem("dwumaPendingVerificationToken", registrationToken);
+        }
+        sessionStorage.setItem("dwumaPendingUser", JSON.stringify({
+          username,
+          email,
+          fullName: data?.fullName || data?.user?.fullName || username,
+        }));
       }
 
       if (!response.ok) {

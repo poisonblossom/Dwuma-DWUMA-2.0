@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 
 import logo from "../assets/logo.svg";
+import DashboardLayout from "../Components/dashboard/DashboardLayout";
+import "../Components/dashboard/Dashboard.css";
 import ParsedCvResponse from "../Components/cv/ParsedCvResponse";
 import TailoringInsights from "../Components/cv/TailoringInsights";
 import "./CvTailorResults.css";
@@ -228,14 +230,13 @@ function CvTailorResults() {
           </article>
 
           <article className="cv-stat-card">
-            <p>Job Match</p>
+            <p>Matched Keywords</p>
 
             <strong>
-              {tailorResult.matchScore ?? "--"}
-              {tailorResult.matchScore != null ? "%" : ""}
+              {tailorResult.matchedKeywords?.length ?? 0}
             </strong>
 
-            <span>Role relevance</span>
+            <span>Keywords found</span>
           </article>
 
           <article className="cv-stat-card">
@@ -404,6 +405,7 @@ function CvTailorResults() {
   }
 
   return (
+    <DashboardLayout pageTitle="CV Tailor">
     <main className="cv-results-page">
       <header className="cv-results-header">
         <button
@@ -541,6 +543,7 @@ function CvTailorResults() {
         </div>
       </section>
     </main>
+    </DashboardLayout>
   );
 }
 

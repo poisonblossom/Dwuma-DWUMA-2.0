@@ -2,24 +2,8 @@ import { useState } from "react";
 import { useLocation } from "wouter";
 import "./CareerPreferences.css";
 
-const JOB_TYPES = [
-  "Full-time",
-  "Part-time",
-  "Freelance/Contract",
-];
-
-const SALARY_RANGES = [
-  "Less than GHS 2,000/month",
-  "GHS 2,000 – 3,999/month",
-  "GHS 4,000 – 5,999/month",
-  "GHS 6,000 – 7,999/month",
-  "GHS 8,000 – 9,999/month",
-  "GHS 10,000 – 14,999/month",
-  "GHS 15,000+/month",
-  "Negotiable",
-];
-
 const JOB_ROLES = [
+  "Account Officer",
   "Software Engineer",
   "Frontend Developer",
   "Backend Developer",
@@ -54,32 +38,62 @@ const JOB_ROLES = [
   "Pharmacist",
   "Teacher",
   "Lecturer",
+  "Agricultural Officer",
+  "Agronomist",
+  "Architect",
+  "Auditor",
+  "Banking Officer",
+  "Biomedical Scientist",
+  "Brand Manager",
+  "Business Development Manager",
+  "Chef",
+  "Compliance Officer",
+  "Content Writer",
+  "Data Engineer",
+  "Database Administrator",
+  "Digital Marketing Specialist",
+  "Electrical Technician",
+  "Environmental Health Officer",
+  "Event Coordinator",
+  "Executive Assistant",
+  "Food Scientist",
+  "Front Desk Officer",
+  "Health and Safety Officer",
+  "Hotel Manager",
+  "Insurance Officer",
+  "Laboratory Technician",
+  "Legal Officer",
+  "Logistics Coordinator",
+  "Maintenance Technician",
+  "Mechanical Technician",
+  "Monitoring and Evaluation Officer",
+  "Operations Manager",
+  "Physician Assistant",
+  "Procurement Manager",
+  "Public Relations Officer",
+  "Quality Assurance Officer",
+  "Research Assistant",
+  "Restaurant Manager",
+  "Risk Analyst",
+  "Social Media Manager",
+  "Supply Chain Analyst",
+  "Surveyor",
+  "Tax Officer",
+  "Warehouse Officer",
+  "Web Developer",
 ];
 
 function CareerPreferences() {
   const [, navigate] = useLocation();
 
   const [formData, setFormData] = useState({
-    jobType: "",
-    salaryRange: "",
     desiredRole: "",
   });
 
   const [errorMessage, setErrorMessage] = useState("");
 
   const isFormComplete =
-    formData.jobType &&
-    formData.salaryRange &&
     formData.desiredRole;
-
-  function selectJobType(jobType) {
-    setFormData((currentData) => ({
-      ...currentData,
-      jobType,
-    }));
-
-    setErrorMessage("");
-  }
 
   function handleSelectChange(event) {
     const { name, value } = event.target;
@@ -97,7 +111,7 @@ function CareerPreferences() {
 
     if (!isFormComplete) {
       setErrorMessage(
-        "Please select your job type, salary range and desired role."
+        "Please select your desired role."
       );
       return;
     }
@@ -134,58 +148,6 @@ function CareerPreferences() {
         </div>
 
         <form className="career-form" onSubmit={handleSubmit}>
-          <fieldset className="job-type-section">
-            <legend>Job type</legend>
-
-            <div className="job-type-options">
-              {JOB_TYPES.map((jobType) => (
-                <button
-                  key={jobType}
-                  type="button"
-                  className={`job-type-button ${
-                    formData.jobType === jobType
-                      ? "job-type-button-selected"
-                      : ""
-                  }`}
-                  onClick={() => selectJobType(jobType)}
-                  aria-pressed={formData.jobType === jobType}
-                >
-                  {formData.jobType === jobType && (
-                    <span className="selected-check">✓</span>
-                  )}
-
-                  {jobType}
-                </button>
-              ))}
-            </div>
-          </fieldset>
-
-          <div className="career-field">
-            <label htmlFor="salaryRange">
-              Expected salary range
-            </label>
-
-            <div className="select-wrapper">
-              <select
-                id="salaryRange"
-                name="salaryRange"
-                value={formData.salaryRange}
-                onChange={handleSelectChange}
-                required
-              >
-                <option value="" disabled>
-                  Select expected salary
-                </option>
-
-                {SALARY_RANGES.map((salary) => (
-                  <option key={salary} value={salary}>
-                    {salary}
-                  </option>
-                ))}
-              </select>
-            </div>
-          </div>
-
           <div className="career-field">
             <label htmlFor="desiredRole">Your role</label>
 

@@ -1,8 +1,7 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
 import "./CareerPreferences.css";
-
-const JOB_FORMS = ["Hybrid", "Remote", "Onsite"];
+import { saveOnboarding } from "../Components/services/onboardingService";
 
 const GHANA_LOCATIONS = {
   "Ahafo": ["Bechem", "Duayaw Nkwanta", "Goaso", "Hwidiem", "Kenyasi"],
@@ -113,13 +112,59 @@ const AVAILABLE_SKILLS = [
   "Verbal Communication",
   "Web Development",
   "Written Communication",
+  "Accounts Payable",
+  "Accounts Receivable",
+  "Adobe InDesign",
+  "Budgeting and Forecasting",
+  "Building Information Modelling (BIM)",
+  "Cash Flow Management",
+  "Clinical Care",
+  "Computer-Aided Design (CAD)",
+  "Contract Management",
+  "Copywriting",
+  "Credit Analysis",
+  "Customer Relationship Management (CRM)",
+  "Electrical Installation",
+  "Emergency Response",
+  "Enterprise Resource Planning (ERP)",
+  "Environmental Impact Assessment",
+  "Event Planning",
+  "Experimental Design",
+  "Financial Modelling",
+  "Food Safety and Quality Control",
+  "Google Analytics",
+  "Graphic Communication",
+  "Human Resource Information Systems",
+  "Inventory Management",
+  "Laboratory Testing",
+  "Legal Research",
+  "Market Research",
+  "Mechanical Maintenance",
+  "Medical Records Management",
+  "Monitoring and Evaluation",
+  "Payroll Administration",
+  "Procurement and Sourcing",
+  "Product Development",
+  "Quality Assurance",
+  "QuickBooks",
+  "Regulatory Compliance",
+  "Risk Management",
+  "Sage Accounting",
+  "Salesforce",
+  "Sensory Evaluation",
+  "Statistical Analysis",
+  "Stock Control",
+  "Tax Compliance",
+  "Technical Report Writing",
+  "Tender Preparation",
+  "Warehouse Management",
+  "Xero",
 ];
 
 function OnboardingStepTwo() {
   const [, navigate] = useLocation();
 
   const [formData, setFormData] = useState({
-    jobForm: "",
     fieldOfWork: "",
     region: "",
     city: "",
@@ -127,22 +172,19 @@ function OnboardingStepTwo() {
   });
 
   const [errorMessage, setErrorMessage] = useState("");
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
+  useEffect(() => {
+    if (!localStorage.getItem("dwumaCareerPreferences")) {
+      navigate("/onboarding/step-1", { replace: true });
+    }
+  }, [navigate]);
 
   const isFormComplete =
-    formData.jobForm !== "" &&
     formData.fieldOfWork !== "" &&
     formData.region !== "" &&
     formData.city !== "" &&
     formData.skills.length > 0;
-
-  function selectJobForm(jobForm) {
-    setFormData((currentData) => ({
-      ...currentData,
-      jobForm,
-    }));
-
-    setErrorMessage("");
-  }
 
   function handleFieldChange(event) {
     setFormData((currentData) => ({
@@ -196,7 +238,7 @@ function OnboardingStepTwo() {
 
     if (!isFormComplete) {
       setErrorMessage(
-        "Please select your job form, field of work, region, city and at least one skill."
+        "Please select your field of work, region, city and at least one skill."
       );
       return;
     }
@@ -221,19 +263,17 @@ function OnboardingStepTwo() {
       location: `${formData.city}, ${formData.region}`,
     };
 
-    localStorage.setItem(
-      "dwumaOnboardingData",
-      JSON.stringify(completeOnboardingData)
-    );
-
-    localStorage.setItem("isOnboarded", "true");
-    sessionStorage.removeItem("dwumaPendingOnboarding");
-
-    const token =
-      localStorage.getItem("dwumaToken") ||
-      sessionStorage.getItem("dwumaToken");
-
-    navigate(token ? "/dashboard" : "/login");
+    setIsSubmitting(true);
+    setErrorMessage("");
+    try {
+      await saveOnboarding(completeOnboardingData);
+      localStorage.removeItem("dwumaCareerPreferences");
+      navigate("/dashboard", { replace: true });
+    } catch (error) {
+      setErrorMessage(error.message || "Your onboarding information could not be saved.");
+    } finally {
+      setIsSubmitting(false);
+    }
   }
 
   function goBack() {
@@ -264,32 +304,6 @@ function OnboardingStepTwo() {
         </div>
 
         <form className="career-form" onSubmit={handleSubmit}>
-          <fieldset className="job-type-section">
-            <legend>Job form</legend>
-
-            <div className="job-type-options">
-              {JOB_FORMS.map((jobForm) => (
-                <button
-                  key={jobForm}
-                  type="button"
-                  className={`job-type-button ${
-                    formData.jobForm === jobForm
-                      ? "job-type-button-selected"
-                      : ""
-                  }`}
-                  onClick={() => selectJobForm(jobForm)}
-                  aria-pressed={formData.jobForm === jobForm}
-                >
-                  {formData.jobForm === jobForm && (
-                    <span className="selected-check">✓</span>
-                  )}
-
-                  {jobForm}
-                </button>
-              ))}
-            </div>
-          </fieldset>
-
           <div className="career-field">
             <label htmlFor="fieldOfWork">Field of work</label>
 
@@ -327,7 +341,12 @@ function OnboardingStepTwo() {
 
             <div className="career-field">
               <label htmlFor="city">City or town</label>
-              <input id="city" name="city" value={formData.city} onChange={handleCityChange} disabled={!formData.region} placeholder={formData.region ? "Enter your city or town" : "Select a region first"} required />
+              <div className="select-wrapper">
+                <select id="city" name="city" value={formData.city} onChange={handleCityChange} disabled={!formData.region} required>
+                  <option value="" disabled>{formData.region ? "Select your city or town" : "Select a region first"}</option>
+                  {(GHANA_LOCATIONS[formData.region] || []).map((city) => <option key={city} value={city}>{city}</option>)}
+                </select>
+              </div>
             </div>
           </div>
 
@@ -381,9 +400,9 @@ function OnboardingStepTwo() {
             <button
               type="submit"
               className="career-next-button"
-              disabled={!isFormComplete}
+              disabled={!isFormComplete || isSubmitting}
             >
-              Finish
+              {isSubmitting ? "Saving..." : "Finish"}
             </button>
           </div>
 

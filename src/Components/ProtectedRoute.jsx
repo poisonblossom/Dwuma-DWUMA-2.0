@@ -1,5 +1,6 @@
-import { useEffect } from "react";
+import { useEffect, useState } from "react";
 import { useLocation } from "wouter";
+import { loadSavedOnboarding } from "./services/onboardingService";
 
 const whitelistPaths = [
   "/",
@@ -19,8 +20,16 @@ function ProtectedRoute({ children }) {
     localStorage.getItem("dwumaToken") ||
     sessionStorage.getItem("dwumaToken");
 
-  const isOnboarded =
-    localStorage.getItem("isOnboarded") === "true";
+  const locallyOnboarded = localStorage.getItem("isOnboarded") === "true";
+  const [onboardingCheck, setOnboardingCheck] = useState({
+    token,
+    status: locallyOnboarded ? "complete" : token ? "checking" : "incomplete",
+  });
+  const effectiveOnboardingStatus = locallyOnboarded
+    ? "complete"
+    : onboardingCheck.token === token
+      ? onboardingCheck.status
+      : "checking";
   const hasPendingOnboarding =
     sessionStorage.getItem("dwumaPendingOnboarding") === "true";
 
@@ -28,21 +37,38 @@ function ProtectedRoute({ children }) {
   const isOnboardingPath = onboardingPaths.includes(location);
 
   useEffect(() => {
+    if (!token || locallyOnboarded || isOnboardingPath) return;
+
+    const controller = new AbortController();
+    loadSavedOnboarding({ signal: controller.signal })
+      .then(({ completed }) => setOnboardingCheck({
+        token,
+        status: completed ? "complete" : "incomplete",
+      }))
+      .catch((error) => {
+        if (error.name !== "AbortError") {
+          setOnboardingCheck({ token, status: "incomplete" });
+        }
+      });
+    return () => controller.abort();
+  }, [token, locallyOnboarded, isOnboardingPath]);
+
+  useEffect(() => {
     if (!token && !isPublicPath && !(isOnboardingPath && hasPendingOnboarding)) {
       navigate("/", { replace: true });
       return;
     }
 
-    if (token && !isOnboarded && !isOnboardingPath) {
+    if (token && effectiveOnboardingStatus === "incomplete" && !isOnboardingPath) {
       navigate("/onboarding/step-1", { replace: true });
     }
-  }, [token, isOnboarded, isOnboardingPath, isPublicPath, hasPendingOnboarding, navigate]);
+  }, [token, effectiveOnboardingStatus, isOnboardingPath, isPublicPath, hasPendingOnboarding, navigate]);
 
   if (!token && !isPublicPath && !(isOnboardingPath && hasPendingOnboarding)) {
     return null;
   }
 
-  if (token && !isOnboarded && !isOnboardingPath) {
+  if (token && effectiveOnboardingStatus !== "complete" && !isOnboardingPath) {
     return null;
   }
 

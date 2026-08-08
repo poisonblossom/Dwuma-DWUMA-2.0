@@ -65,7 +65,7 @@ function Dashboard() {
   const interview = latestInterview;
   const jobs = dashboardData?.recommendedJobs ?? [];
   const unreadNotifications =
-    dashboardData?.unreadNotifications ?? 0;
+    dashboardData?.unreadNotifications;
 
   return (
     <DashboardLayout

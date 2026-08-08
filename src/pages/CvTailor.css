@@ -294,7 +294,7 @@ button {
 
 .cv-tailor-grid {
   display: grid;
-  grid-template-columns: repeat(2, minmax(0, 1fr));
+  grid-template-columns: minmax(0, 1fr);
   gap: 15px;
   margin-top: 15px;
 }
@@ -655,4 +655,70 @@ button {
   .cv-tailor-reset-button {
     width: 100%;
   }
+}
+
+/* Shared dashboard visual system */
+.dashboard-content .cv-tailor-screen {
+  min-height: 0;
+  background: transparent;
+}
+
+.dashboard-content .cv-tailor-header,
+.dashboard-content .cv-tailor-menu-button,
+.dashboard-content .cv-tailor-menu-overlay,
+.dashboard-content .cv-tailor-menu {
+  display: none;
+}
+
+.dashboard-content .cv-tailor-body {
+  min-height: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.dashboard-content .cv-tailor-content {
+  width: 100%;
+}
+
+.dashboard-content .cv-tailor-heading {
+  margin-bottom: 20px;
+  color: #6f080c;
+  text-align: left;
+}
+
+.dashboard-content .cv-tailor-heading h1 {
+  font-size: clamp(25px, 3vw, 34px);
+}
+
+.dashboard-content .cv-tailor-heading p {
+  margin: 7px 0 0;
+  color: #8b7476;
+}
+
+.dashboard-content .cv-upload-card,
+.dashboard-content .cv-tailor-card {
+  background: rgba(255, 255, 255, 0.96);
+  border: 1px solid #f0dfdf;
+  box-shadow: 0 9px 26px rgba(76, 0, 3, 0.07);
+}
+
+.dashboard-content .cv-tailor-bottom-actions {
+  justify-content: flex-end;
+}
+
+.dashboard-content .cv-tailor-submit-button {
+  color: #ffffff;
+  background: #95090c;
+  border-color: #95090c;
+  box-shadow: none;
+}
+
+.dashboard-content .cv-tailor-submit-button:hover {
+  background: #760609;
+}
+
+.dashboard-content .cv-tailor-reset-button {
+  color: #95090c;
+  background: #ffffff;
+  border-color: #d9aeb0;
 }

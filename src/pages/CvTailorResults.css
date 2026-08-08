@@ -864,3 +864,54 @@ input {
     right: 9px;
   }
 }
+
+/* Shared dashboard visual system */
+.dashboard-content .cv-results-page {
+  min-height: 0;
+  background: transparent;
+}
+
+.dashboard-content .cv-results-header,
+.dashboard-content .cv-results-menu-button,
+.dashboard-content .cv-results-menu-overlay,
+.dashboard-content .cv-results-menu {
+  display: none;
+}
+
+.dashboard-content .cv-results-body {
+  min-height: 0;
+  padding: 0;
+  background: transparent;
+}
+
+.dashboard-content .cv-results-container {
+  width: 100%;
+  padding-top: 54px;
+}
+
+.dashboard-content .cv-results-back-button {
+  top: 0;
+  right: 0;
+  color: #8c0a0f;
+  background: #ffffff;
+  border-color: #e2c7c8;
+}
+
+.dashboard-content .cv-results-introduction {
+  justify-content: flex-start;
+  color: #6f080c;
+}
+
+.dashboard-content .cv-results-introduction p {
+  color: #8b7476;
+}
+
+.dashboard-content .cv-stat-card,
+.dashboard-content .cv-preview-card,
+.dashboard-content .cv-improvements-card,
+.dashboard-content .cv-download-card,
+.dashboard-content .tailoring-insights-card,
+.dashboard-content .cv-results-state-card {
+  border: 1px solid #f0dfdf;
+  box-shadow: 0 9px 26px rgba(76, 0, 3, 0.07);
+}

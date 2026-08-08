@@ -8,9 +8,16 @@ function getAuthToken() {
   );
 }
 
-export async function getJobs({ signal } = {}) {
+export async function getJobs({ query, location, jobType, remote, nextPageToken, signal } = {}) {
   const token = getAuthToken();
-  const response = await fetch(`${API_BASE_URL}/jobs`, {
+  const parameters = new URLSearchParams();
+  if (query?.trim()) parameters.set("query", query.trim());
+  if (location?.trim()) parameters.set("location", location.trim());
+  if (jobType?.trim()) parameters.set("jobType", jobType.trim());
+  if (typeof remote === "boolean") parameters.set("remote", String(remote));
+  if (nextPageToken) parameters.set("nextPageToken", nextPageToken);
+
+  const response = await fetch(`${API_BASE_URL}/jobs/search?${parameters.toString()}`, {
     method: "GET",
     signal,
     headers: {
@@ -28,5 +35,9 @@ export async function getJobs({ signal } = {}) {
     ? payload
     : payload.jobs || payload.items || payload.data || [];
 
-  return Array.isArray(jobs) ? jobs : [];
+  return {
+    jobs: Array.isArray(jobs) ? jobs : [],
+    nextPageToken: payload?.nextPageToken || null,
+    hasMore: Boolean(payload?.hasMore && payload?.nextPageToken),
+  };
 }

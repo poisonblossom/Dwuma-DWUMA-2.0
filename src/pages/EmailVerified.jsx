@@ -46,12 +46,29 @@ function EmailVerified() {
           },
         );
 
+        const data = await response.json().catch(() => null);
+
         if (!response.ok) {
           throw new Error("Verification failed.");
         }
 
+        const authToken =
+          data?.token || data?.accessToken || data?.jwtToken ||
+          sessionStorage.getItem("dwumaPendingVerificationToken");
+        const pendingUser = sessionStorage.getItem("dwumaPendingUser");
+
+        if (!authToken) {
+          throw new Error("Verification succeeded, but no authenticated session was returned.");
+        }
+
+        sessionStorage.setItem("dwumaToken", authToken);
+        if (pendingUser) sessionStorage.setItem("dwumaUser", pendingUser);
+        sessionStorage.setItem("dwumaPendingOnboarding", "true");
+        localStorage.setItem("isOnboarded", "false");
         sessionStorage.removeItem("pendingVerificationEmail");
-        setVerificationStatus("success");
+        sessionStorage.removeItem("dwumaPendingVerificationToken");
+        sessionStorage.removeItem("dwumaPendingUser");
+        navigate("/onboarding/step-1", { replace: true });
       } catch (error) {
         console.error(error);
         setVerificationStatus("failed");
@@ -59,7 +76,7 @@ function EmailVerified() {
     };
 
     verifyEmail();
-  }, [email, token]);
+  }, [email, token, navigate]);
 
   if (verificationStatus === "verifying") {
     return (

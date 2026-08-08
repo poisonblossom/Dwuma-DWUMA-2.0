@@ -50,11 +50,16 @@ const navigationItems = [
 ];
 
 function DashboardSidebar({
+  user,
   unreadNotifications = 0,
   isOpen = false,
   onClose,
 }) {
   const [location, navigate] = useLocation();
+  const userName = String(
+    user?.username || user?.fullName || user?.name || user?.firstName || user?.email || "Account"
+  ).trim();
+  const userInitial = userName.charAt(0).toUpperCase() || "U";
 
   function isActive(path) {
     if (path === "/dashboard") {
@@ -126,15 +131,11 @@ function DashboardSidebar({
 
       <div className="dashboard-sidebar-profile">
         <div className="dashboard-sidebar-avatar">
-          {/*
-            Profile image or initials can come
-            from the backend later.
-          */}
-          <UserRound size={19} />
+          {userInitial}
         </div>
 
         <div className="dashboard-sidebar-profile-text">
-          <strong>Account</strong>
+          <strong>{userName}</strong>
           <span>Graduate</span>
         </div>
       </div>

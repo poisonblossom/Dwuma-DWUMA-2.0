@@ -3,7 +3,6 @@ import { useLocation } from "wouter";
 import {
   Bell,
   BriefcaseBusiness,
-  Check,
   FileText,
   LayoutDashboard,
   LoaderCircle,
@@ -12,62 +11,13 @@ import {
   Upload,
   UserRound,
   UsersRound,
-  WandSparkles,
 } from "lucide-react";
 
 import logo from "../assets/logo.svg";
-import { parseCv, tailorCv } from "../Components/services/cvTailorService";
+import DashboardLayout from "../Components/dashboard/DashboardLayout";
+import "../Components/dashboard/Dashboard.css";
+import { tailorCv } from "../Components/services/cvTailorService";
 import "./CvTailor.css";
-
-const tailoringOptions = [
-  {
-    id: "grammar",
-    label: "Improve grammar & clarity",
-  },
-  {
-    id: "summary",
-    label: "Professional summary boost",
-  },
-  {
-    id: "ats",
-    label: "ATS optimization",
-  },
-  {
-    id: "match-job",
-    label: "Match job description",
-  },
-  {
-    id: "action-verbs",
-    label: "Stronger action verbs",
-  },
-  {
-    id: "strengths",
-    label: "Highlight key strengths",
-  },
-  {
-    id: "achievements",
-    label: "Enhance achievements",
-  },
-  {
-    id: "remove-content",
-    label: "Remove irrelevant content",
-  },
-  {
-    id: "skills",
-    label: "Optimize skills section",
-  },
-  {
-    id: "graduate-focus",
-    label: "Graduate job focus",
-  },
-];
-
-function createDefaultOptions() {
-  return tailoringOptions.reduce((options, item) => {
-    options[item.id] = true;
-    return options;
-  }, {});
-}
 
 function CvTailor() {
   const [, navigate] = useLocation();
@@ -78,12 +28,9 @@ function CvTailor() {
   const [jobDescription, setJobDescription] = useState("");
   const [jobTitle, setJobTitle] = useState("");
   const [companyName, setCompanyName] = useState("");
-  const [tailoringFocus, setTailoringFocus] = useState("");
   const [isDragging, setIsDragging] = useState(false);
   const [statusMessage, setStatusMessage] = useState("");
   const [isSubmitting, setIsSubmitting] = useState(false);
-  const [selectedOptions, setSelectedOptions] =
-    useState(createDefaultOptions);
 
   function closeMenu() {
     setMenuOpen(false);
@@ -163,20 +110,11 @@ function CvTailor() {
     validateAndSaveFile(file);
   }
 
-  function toggleOption(optionId) {
-    setSelectedOptions((currentOptions) => ({
-      ...currentOptions,
-      [optionId]: !currentOptions[optionId],
-    }));
-  }
-
   function resetCvTailor() {
     setSelectedFile(null);
     setJobDescription("");
     setJobTitle("");
     setCompanyName("");
-    setTailoringFocus("");
-    setSelectedOptions(createDefaultOptions());
     setStatusMessage("");
 
     sessionStorage.removeItem(
@@ -197,32 +135,12 @@ function CvTailor() {
       return;
     }
 
-    const enabledOptions = Object.entries(
-      selectedOptions
-    )
-      .filter(([, enabled]) => enabled)
-      .map(([optionId]) => optionId);
-
-    if (enabledOptions.length === 0) {
+    if (!jobTitle.trim()) {
       setStatusMessage(
-        "Select at least one tailoring preference."
-      );
-
-      return;
-    }
-
-    if (!jobTitle.trim() || !jobDescription.trim()) {
-      setStatusMessage(
-        "Add the target job title and job description before tailoring your CV."
+        "Add the target job title before tailoring your CV."
       );
       return;
     }
-
-    const selectedFocusLabels = tailoringOptions
-      .filter((option) => enabledOptions.includes(option.id))
-      .map((option) => option.label);
-    const resolvedTailoringFocus =
-      tailoringFocus.trim() || selectedFocusLabels.join(", ");
 
     const cvTailorRequest = {
       fileName: selectedFile.name,
@@ -231,8 +149,6 @@ function CvTailor() {
       jobTitle: jobTitle.trim(),
       companyName: companyName.trim(),
       jobDescription: jobDescription.trim(),
-      tailoringFocus: resolvedTailoringFocus,
-      preferences: enabledOptions,
       submittedAt: new Date().toISOString(),
     };
 
@@ -252,19 +168,16 @@ function CvTailor() {
     setStatusMessage("");
 
     try {
-      const parsedResult = await parseCv(selectedFile);
       const result = await tailorCv({
-        cvText: parsedResult.text,
+        file: selectedFile,
         jobTitle: jobTitle.trim(),
         jobDescription: jobDescription.trim(),
         companyName: companyName.trim(),
-        tailoringFocus: resolvedTailoringFocus,
       });
       sessionStorage.setItem(
         "dwumaCvTailorResult",
         JSON.stringify({
           type: "tailored-cv",
-          parsedText: parsedResult.text,
           previewText: result.tailoredCv,
           tailoredCv: result.tailoredCv,
           atsScore: result.atsScore,
@@ -285,6 +198,7 @@ function CvTailor() {
   }
 
   return (
+    <DashboardLayout pageTitle="CV Tailor">
     <main className="cv-tailor-screen">
       <header className="cv-tailor-header">
         <button
@@ -413,7 +327,7 @@ function CvTailor() {
 
         <div className="cv-tailor-content">
           <div className="cv-tailor-heading">
-            <h1>Better That Resume</h1>
+            <h1>CV Tailor</h1>
 
             <p>
               Upload your CV and tailor it for the role
@@ -552,76 +466,6 @@ function CvTailor() {
                 {jobDescription.length}/2000 characters
               </span>
 
-              <label className="cv-tailoring-focus-label">
-                Tailoring focus
-                <textarea
-                  className="cv-tailoring-focus"
-                  value={tailoringFocus}
-                  onChange={(event) => setTailoringFocus(event.target.value.slice(0, 500))}
-                  placeholder="Optional: describe what you most want the tailored CV to emphasize."
-                  maxLength={500}
-                />
-              </label>
-            </section>
-
-            <section className="cv-tailor-card">
-              <div className="cv-card-heading">
-                <span className="cv-card-icon">
-                  <WandSparkles
-                    size={22}
-                    strokeWidth={2}
-                  />
-                </span>
-
-                <div>
-                  <h2>Tailoring Preferences</h2>
-
-                  <p>
-                    Select the improvements you want
-                    applied to your CV.
-                  </p>
-                </div>
-              </div>
-
-              <div className="cv-options-grid">
-                {tailoringOptions.map((option) => {
-                  const isSelected =
-                    selectedOptions[option.id];
-
-                  return (
-                    <button
-                      key={option.id}
-                      type="button"
-                      className={`cv-option ${
-                        isSelected
-                          ? "cv-option-selected"
-                          : ""
-                      }`}
-                      onClick={() =>
-                        toggleOption(option.id)
-                      }
-                      aria-pressed={isSelected}
-                    >
-                      <span
-                        className={`cv-option-checkbox ${
-                          isSelected
-                            ? "cv-option-checkbox-selected"
-                            : ""
-                        }`}
-                      >
-                        {isSelected && (
-                          <Check
-                            size={13}
-                            strokeWidth={3}
-                          />
-                        )}
-                      </span>
-
-                      <span>{option.label}</span>
-                    </button>
-                  );
-                })}
-              </div>
             </section>
           </div>
 
@@ -651,13 +495,14 @@ function CvTailor() {
               disabled={isSubmitting}
             >
               {isSubmitting ? (
-                <><LoaderCircle className="cv-tailor-spinner" size={17} />Parsing and tailoring...</>
+                <><LoaderCircle className="cv-tailor-spinner" size={17} />Tailoring your CV...</>
               ) : "Tailor My CV"}
             </button>
           </div>
         </div>
       </section>
     </main>
+    </DashboardLayout>
   );
 }
 

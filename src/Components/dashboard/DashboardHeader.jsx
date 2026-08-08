@@ -3,9 +3,16 @@ import {
   Menu,
   Search,
 } from "lucide-react";
+import { useLocation } from "wouter";
+
+function getUserName(user) {
+  return String(
+    user?.username || user?.fullName || user?.name || user?.firstName || user?.email || ""
+  ).trim();
+}
 
 function getInitial(user) {
-  const firstName = user?.firstName?.trim();
+  const firstName = getUserName(user);
 
   if (!firstName) {
     return "U";
@@ -18,8 +25,10 @@ function DashboardHeader({
   user,
   unreadNotifications = 0,
   onOpenSidebar,
+  pageTitle = "Dashboard",
 }) {
-  const firstName = user?.firstName?.trim();
+  const [, navigate] = useLocation();
+  const firstName = getUserName(user).split(/\s+/)[0];
 
   return (
     <header className="dashboard-header">
@@ -42,7 +51,7 @@ function DashboardHeader({
               <span />
             </span>
 
-            <h1>Dashboard</h1>
+            <h1>{pageTitle}</h1>
           </div>
 
           <p>
@@ -73,6 +82,7 @@ function DashboardHeader({
           type="button"
           className="dashboard-notification-button"
           aria-label="Notifications"
+          onClick={() => navigate("/dashboard/notifications")}
         >
           <Bell size={20} />
 
@@ -89,6 +99,7 @@ function DashboardHeader({
           type="button"
           className="dashboard-user-button"
           aria-label="Open profile"
+          onClick={() => navigate("/dashboard/profile")}
         >
           {getInitial(user)}
         </button>

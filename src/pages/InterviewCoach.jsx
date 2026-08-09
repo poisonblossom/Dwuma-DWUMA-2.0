@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
@@ -9,10 +9,16 @@ import {
   Lightbulb,
   LoaderCircle,
   MessageSquareText,
+  Mic,
+  Pause,
+  Play,
   RotateCcw,
   Sparkles,
+  Square,
   Target,
   Trophy,
+  Volume2,
+  VolumeX,
 } from "lucide-react";
 
 import DashboardLayout from "../Components/dashboard/DashboardLayout";
@@ -23,11 +29,15 @@ import {
   cacheCompletedInterview,
   clearCachedInterviewResult,
 } from "../Components/services/interviewService";
+import {
+  evaluateVoiceInterviewAnswer,
+} from "../Components/services/audioService";
 import "../Components/dashboard/Dashboard.css";
 import "./InterviewCoach.css";
 
 const SESSION_KEY = "dwumaInterviewSession";
 const MAX_ANSWER_LENGTH = 4000;
+const MAX_RECORDING_SECONDS = 5 * 60;
 
 const EMPTY_SETUP = {
   jobTitle: "",
@@ -54,6 +64,21 @@ function restoreSession() {
 function persistSession(session) {
   if (session) sessionStorage.setItem(SESSION_KEY, JSON.stringify(session));
   else sessionStorage.removeItem(SESSION_KEY);
+}
+
+function getAvailableUsername() {
+  try {
+    const user = JSON.parse(
+      localStorage.getItem("dwumaUser") ||
+        sessionStorage.getItem("dwumaUser") ||
+        "{}",
+    );
+    const value =
+      user.username || user.fullName || user.name || user.firstName || "";
+    return String(value).trim().split(/\s+/)[0] || "there";
+  } catch {
+    return "there";
+  }
 }
 
 function ScoreRing({ score, label = "Answer score" }) {
@@ -89,6 +114,16 @@ function InterviewCoach() {
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [recordingState, setRecordingState] = useState("idle");
+  const [recordingSeconds, setRecordingSeconds] = useState(0);
+  const [speechState, setSpeechState] = useState("idle");
+  const mediaRecorderRef = useRef(null);
+  const microphoneStreamRef = useRef(null);
+  const recordingChunksRef = useRef([]);
+  const discardRecordingRef = useRef(false);
+  const recordingTimerRef = useRef(null);
+  const utteranceRef = useRef(null);
+  const transcriptionRequestRef = useRef(null);
 
   const currentQuestion = questions[currentIndex];
   const completedCount = answers.length;
@@ -109,6 +144,186 @@ function InterviewCoach() {
       phase,
     });
   }, [setup, sessionId, questions, answers, currentIndex, answer, feedback, phase]);
+
+  useEffect(() => () => {
+    clearInterval(recordingTimerRef.current);
+    transcriptionRequestRef.current?.abort();
+    window.speechSynthesis?.cancel();
+    microphoneStreamRef.current?.getTracks().forEach((track) => track.stop());
+  }, []);
+
+  function stopCoachAudio() {
+    window.speechSynthesis?.cancel();
+    utteranceRef.current = null;
+    setSpeechState("idle");
+  }
+
+  function pauseCoachAudio() {
+    if (!window.speechSynthesis || speechState !== "playing") return;
+    window.speechSynthesis.pause();
+    setSpeechState("paused");
+  }
+
+  function resumeCoachAudio() {
+    if (!window.speechSynthesis || speechState !== "paused") return;
+    window.speechSynthesis.resume();
+    setSpeechState("playing");
+  }
+
+  function playCoachAudio(text) {
+    stopCoachAudio();
+    setError("");
+    if (!window.speechSynthesis || !window.SpeechSynthesisUtterance) {
+      setError("Spoken questions are not supported by this browser.");
+      return;
+    }
+    const utterance = new SpeechSynthesisUtterance(text);
+    utterance.lang = "en-US";
+    utterance.rate = 0.95;
+    utterance.pitch = 1;
+    utterance.onend = () => {
+      if (utteranceRef.current === utterance) {
+        utteranceRef.current = null;
+        setSpeechState("idle");
+      }
+    };
+    utterance.onerror = (event) => {
+      if (event.error === "canceled" || event.error === "interrupted") return;
+      if (utteranceRef.current === utterance) {
+        utteranceRef.current = null;
+        setSpeechState("idle");
+        setError("The interview question could not be spoken by this browser.");
+      }
+    };
+    utteranceRef.current = utterance;
+    window.speechSynthesis.speak(utterance);
+    setSpeechState("playing");
+  }
+
+  function releaseMicrophone() {
+    clearInterval(recordingTimerRef.current);
+    recordingTimerRef.current = null;
+    microphoneStreamRef.current?.getTracks().forEach((track) => track.stop());
+    microphoneStreamRef.current = null;
+    mediaRecorderRef.current = null;
+  }
+
+  async function startRecording() {
+    if (feedback || recordingState === "transcribing") return;
+    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
+      setError("Audio recording is not supported by this browser. You can still type your answer.");
+      return;
+    }
+    stopCoachAudio();
+    setError("");
+    try {
+      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+      const recorder = new MediaRecorder(stream);
+      discardRecordingRef.current = false;
+      microphoneStreamRef.current = stream;
+      mediaRecorderRef.current = recorder;
+      recordingChunksRef.current = [];
+      recorder.addEventListener("dataavailable", (event) => {
+        if (event.data.size) recordingChunksRef.current.push(event.data);
+      });
+      recorder.addEventListener("stop", async () => {
+        const recordingType = (recorder.mimeType || "audio/webm")
+          .split(";", 1)[0]
+          .trim()
+          .toLowerCase();
+        const audioBlob = new Blob(recordingChunksRef.current, {
+          type: recordingType,
+        });
+        recordingChunksRef.current = [];
+        releaseMicrophone();
+        if (discardRecordingRef.current) {
+          discardRecordingRef.current = false;
+          return;
+        }
+        if (!audioBlob.size) {
+          setRecordingState("idle");
+          setError("No audio was recorded. Please try again.");
+          return;
+        }
+        setRecordingState("transcribing");
+        const controller = new AbortController();
+        transcriptionRequestRef.current = controller;
+        try {
+          const result = await evaluateVoiceInterviewAnswer({
+            sessionId,
+            questionId: currentQuestion.id,
+            jobTitle: setup.jobTitle,
+            companyName: setup.companyName,
+            jobDescription: setup.jobDescription,
+            question: currentQuestion.question,
+            audioBlob,
+          }, { signal: controller.signal });
+          if (!controller.signal.aborted) {
+            setAnswer(result.transcription.slice(0, MAX_ANSWER_LENGTH));
+            setFeedback(result.feedback);
+            setAnswers((current) => [...current, {
+              question: currentQuestion,
+              answer: result.transcription,
+              feedback: result.feedback,
+            }]);
+            setRecordingState("ready");
+          }
+        } catch (requestError) {
+          if (requestError.name !== "AbortError") {
+            setRecordingState("error");
+            setError(requestError.message);
+          }
+        } finally {
+          if (transcriptionRequestRef.current === controller) {
+            transcriptionRequestRef.current = null;
+          }
+        }
+      }, { once: true });
+      recorder.start();
+      setRecordingSeconds(0);
+      setRecordingState("recording");
+      recordingTimerRef.current = setInterval(() => {
+        setRecordingSeconds((seconds) => {
+          const next = seconds + 1;
+          if (next >= MAX_RECORDING_SECONDS && recorder.state === "recording") {
+            recorder.stop();
+          }
+          return next;
+        });
+      }, 1000);
+    } catch (requestError) {
+      releaseMicrophone();
+      setRecordingState("error");
+      setError(
+        requestError.name === "NotAllowedError"
+          ? "Microphone access was denied. You can allow it in your browser settings or type your answer."
+          : "The microphone could not be started. Please try again or type your answer.",
+      );
+    }
+  }
+
+  function stopRecording() {
+    const recorder = mediaRecorderRef.current;
+    if (recorder?.state === "recording") recorder.stop();
+  }
+
+  function clearVoiceActivity() {
+    stopCoachAudio();
+    transcriptionRequestRef.current?.abort();
+    transcriptionRequestRef.current = null;
+    if (mediaRecorderRef.current?.state === "recording") {
+      discardRecordingRef.current = true;
+      mediaRecorderRef.current.stop();
+    }
+    releaseMicrophone();
+    recordingChunksRef.current = [];
+    setRecordingSeconds(0);
+    setRecordingState("idle");
+  }
+
+  function formatRecordingTime(seconds) {
+    return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
+  }
 
   function updateSetup(event) {
     const { name, value } = event.target;
@@ -162,6 +377,12 @@ function InterviewCoach() {
         feedback: null,
         phase: "interview",
       });
+      const firstQuestion = result.questions[0]?.question;
+      if (firstQuestion) {
+        playCoachAudio(
+          `Hi ${getAvailableUsername()}, welcome to your interview practice. Let's begin. Here is your first question. ${firstQuestion}`,
+        );
+      }
     } catch (requestError) {
       setError(requestError.message);
     } finally {
@@ -204,15 +425,24 @@ function InterviewCoach() {
   }
 
   function goToQuestion(index) {
+    clearVoiceActivity();
     const reviewedAnswer = answers[index];
     setCurrentIndex(index);
     setAnswer(reviewedAnswer?.answer || "");
     setFeedback(reviewedAnswer?.feedback || null);
     setError("");
+    const nextQuestion = questions[index]?.question;
+    if (nextQuestion) {
+      playCoachAudio(`Question ${index + 1}. ${nextQuestion}`);
+    }
   }
 
   function previousQuestion() {
     if (currentIndex > 0) goToQuestion(currentIndex - 1);
+  }
+
+  function selectQuestion(event) {
+    goToQuestion(Number(event.currentTarget.dataset.questionIndex));
   }
 
   async function nextQuestion() {
@@ -243,6 +473,7 @@ function InterviewCoach() {
   }
 
   function resetInterview() {
+    clearVoiceActivity();
     persistSession(null);
     setSetup(EMPTY_SETUP);
     setQuestions([]);
@@ -316,9 +547,31 @@ function InterviewCoach() {
             <div className="coach-question-meta"><span className={`coach-category coach-category-${currentQuestion.category}`}>{currentQuestion.category || "general"}</span><span>{currentQuestion.difficulty || "practice"}</span></div>
             <p className="coach-question-number">Question {currentIndex + 1}</p>
             <h2>{currentQuestion.question}</h2>
+            <div className="coach-voice-controls" aria-label="Interview voice controls">
+              {speechState === "playing" ? (
+                <button type="button" className="coach-voice-button" onClick={pauseCoachAudio}><Pause />Pause coach</button>
+              ) : speechState === "paused" ? (
+                <button type="button" className="coach-voice-button" onClick={resumeCoachAudio}><Play />Resume coach</button>
+              ) : (
+                <button type="button" className="coach-voice-button" onClick={() => playCoachAudio(currentQuestion.question)}>
+                  <Volume2 />Read question aloud
+                </button>
+              )}
+              {(speechState === "playing" || speechState === "paused") && <button type="button" className="coach-voice-button coach-voice-stop" onClick={stopCoachAudio}><VolumeX />Stop</button>}
+            </div>
             {currentQuestion.whatInterviewerLooksFor && <details><summary><Lightbulb size={15} />What the interviewer is looking for</summary><p>{currentQuestion.whatInterviewerLooksFor}</p></details>}
             <form onSubmit={submitAnswer} className="coach-answer-form">
               <label htmlFor="interview-answer">{feedback ? "Your submitted answer" : "Your answer"}</label>
+              {!feedback && <div className="coach-recording-controls">
+                {recordingState === "recording" ? (
+                  <button type="button" className="coach-record-button coach-recording-active" onClick={stopRecording}><Square />Stop recording <span>{formatRecordingTime(recordingSeconds)}</span></button>
+                ) : (
+                  <button type="button" className="coach-record-button" onClick={startRecording} disabled={recordingState === "transcribing"}>
+                    {recordingState === "transcribing" ? <LoaderCircle className="coach-spinner" /> : <Mic />}{recordingState === "transcribing" ? "Transcribing and evaluating..." : recordingState === "ready" ? "Answer evaluated" : "Record answer"}
+                  </button>
+                )}
+                <span>{recordingState === "ready" ? "Your transcription and feedback are ready." : "Voice input is optional."}</span>
+              </div>}
               <textarea id="interview-answer" value={answer} onChange={(event) => { setAnswer(event.target.value); setError(""); }} maxLength={MAX_ANSWER_LENGTH} rows="8" placeholder="Structure your thinking, give a specific example, and explain the outcome..." autoFocus={!feedback} readOnly={Boolean(feedback)} />
               {!feedback && <div className="coach-answer-footer"><span>{answer.length.toLocaleString()} / {MAX_ANSWER_LENGTH.toLocaleString()}</span><button className="coach-primary-button" disabled={loading || answer.trim().length < 10}>{loading ? <><LoaderCircle className="coach-spinner" />Reviewing...</> : <>Get feedback<ArrowRight size={17} /></>}</button></div>}
               {error && <p className="coach-error" role="alert"><CircleAlert size={16} />{error}</p>}
@@ -328,7 +581,7 @@ function InterviewCoach() {
         </div>
         <nav className="coach-question-navigation" aria-label="Interview question navigation">
           <button className="coach-secondary-button" onClick={previousQuestion} disabled={currentIndex === 0}><ArrowLeft size={16} />Previous question</button>
-          <div className="coach-question-dots">{questions.map((question, index) => <button key={question.number || index} className={index === currentIndex ? "coach-dot-active" : index < answers.length ? "coach-dot-complete" : ""} onClick={() => index <= answers.length && goToQuestion(index)} disabled={index > answers.length} aria-label={`Go to question ${index + 1}`} aria-current={index === currentIndex ? "step" : undefined}>{index + 1}</button>)}</div>
+          <div className="coach-question-dots">{questions.map((question, index) => <button key={question.number || index} data-question-index={index} className={index === currentIndex ? "coach-dot-active" : index < answers.length ? "coach-dot-complete" : ""} onClick={selectQuestion} disabled={index > answers.length} aria-label={`Go to question ${index + 1}`} aria-current={index === currentIndex ? "step" : undefined}>{index + 1}</button>)}</div>
           <button className="coach-primary-button" onClick={nextQuestion} disabled={!feedback || loading}>{currentIndex + 1 === questions.length ? <>{loading ? "Finalising..." : "View results"}<Trophy size={17} /></> : <>Next question<ChevronRight size={18} /></>}</button>
         </nav>
       </div>

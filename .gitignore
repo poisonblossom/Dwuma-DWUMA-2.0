@@ -24,19 +24,5 @@ dist-ssr
 *.sw?
 
 Dwuma/*
-!Dwuma/Controllers/
-Dwuma/Controllers/*
-!Dwuma/Controllers/InterviewCoachController.cs
-!Dwuma/Services/
-Dwuma/Services/*
-!Dwuma/Services/InterviewCoachService.cs
-!Dwuma/Models/
-Dwuma/Models/*
-!Dwuma/Models/Interview/
-Dwuma/Models/Interview/*
-!Dwuma/Models/Interview/InterviewAnswerRequest.cs
-!Dwuma/Models/Interview/InterviewQuestionResponse.cs
-!Dwuma/Models/Interview/InterviewSessionResponses.cs
-!Dwuma/Models/Interview/VoiceInterviewRequest.cs
 
 Dwuma.sln

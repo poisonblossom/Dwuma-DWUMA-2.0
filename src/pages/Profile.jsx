@@ -6,7 +6,6 @@ import {
   ExternalLink,
   FileText,
   GraduationCap,
-  Link2,
   Mail,
   MapPin,
   Pencil,
@@ -53,7 +52,7 @@ function Profile() {
   const [editMessage, setEditMessage] = useState("");
   const [editForm, setEditForm] = useState({
     fullName: "", email: "", phoneNumber: "", location: "",
-    fieldOfStudy: "", education: "", linkedin: "", skills: "",
+    fieldOfStudy: "", skills: "",
   });
 
   useEffect(() => {
@@ -62,7 +61,7 @@ function Profile() {
     async function fetchProfile() {
       try {
         const token = getAuthToken();
-        const response = await fetch(`${API_BASE_URL}/profile`, {
+        const response = await fetch(`${API_BASE_URL}/Profile/me`, {
           signal: controller.signal,
           headers: {
             Accept: "application/json",
@@ -103,17 +102,6 @@ function Profile() {
       value: valueOf(displayProfile, "fieldOfStudy", "fieldOfWork", "studyField") || "Not added",
       icon: GraduationCap,
     },
-    {
-      label: "Education",
-      value: valueOf(displayProfile, "education", "educationLevel", "degree") || "Not added",
-      icon: GraduationCap,
-    },
-    {
-      label: "LinkedIn",
-      value: valueOf(displayProfile, "linkedin", "linkedIn", "linkedinUrl") || "Not added",
-      icon: Link2,
-      link: valueOf(displayProfile, "linkedin", "linkedIn", "linkedinUrl"),
-    },
   ];
 
   const skillsSource = valueOf(displayProfile, "skills");
@@ -130,9 +118,7 @@ function Profile() {
       phoneNumber: valueOf(displayProfile, "phoneNumber", "phone"),
       location: profileLocation,
       fieldOfStudy: valueOf(displayProfile, "fieldOfStudy", "fieldOfWork", "studyField"),
-      education: valueOf(displayProfile, "education", "educationLevel", "degree"),
-      linkedin: valueOf(displayProfile, "linkedin", "linkedIn", "linkedinUrl"),
-      skills: skills.map((skill) => typeof skill === "string" ? skill : valueOf(skill, "name", "skillName", "title")).filter(Boolean).join(", "),
+      skills: (valueOf(displayProfile, "techSkills") || skills).map((skill) => typeof skill === "string" ? skill : valueOf(skill, "name", "skillName", "title")).filter(Boolean).join(", "),
     });
     setEditMessage("");
     setIsEditing(true);
@@ -152,24 +138,30 @@ function Profile() {
     }
 
     const nextSkills = editForm.skills.split(",").map((skill) => skill.trim()).filter(Boolean);
+    const nameParts = editForm.fullName.trim().split(/\s+/).filter(Boolean);
     const payload = {
-      fullName: editForm.fullName.trim(),
+      ...profile,
+      firstName: nameParts[0] || "Dwuma",
+      lastName: nameParts.slice(1).join(" ") || "User",
       email: editForm.email.trim().toLowerCase(),
-      phoneNumber: editForm.phoneNumber.trim(),
+      phone: editForm.phoneNumber.trim() || null,
       location: editForm.location.trim(),
       fieldOfStudy: editForm.fieldOfStudy.trim(),
-      careerField: editForm.fieldOfStudy.trim(),
-      education: editForm.education.trim(),
-      linkedin: editForm.linkedin.trim(),
-      skills: nextSkills,
+      workLocation: editForm.location.trim(),
+      techSkills: nextSkills,
+      softSkills: profile?.softSkills || [],
+      languages: profile?.languages || [],
+      certifications: profile?.certifications || [],
+      industries: profile?.industries || [],
+      jobTypes: profile?.jobTypes || [],
     };
 
     setIsSaving(true);
     setEditMessage("");
     try {
       const token = getAuthToken();
-      const response = await fetch(`${API_BASE_URL}/settings/account`, {
-        method: "PUT",
+      const response = await fetch(`${API_BASE_URL}/Profile`, {
+        method: "POST",
         headers: {
           "Content-Type": "application/json",
           ...(token ? { Authorization: `Bearer ${token}` } : {}),
@@ -181,11 +173,17 @@ function Profile() {
         throw new Error(error?.message || error?.title || "Your profile could not be saved.");
       }
 
-      setProfile((current) => ({ ...(current || {}), ...payload }));
-      const nextStoredUser = { ...storedUser, ...payload };
+      const savedProfile = {
+        ...payload,
+        fullName: editForm.fullName.trim(),
+        phoneNumber: payload.phone,
+        skills: nextSkills,
+      };
+      setProfile(savedProfile);
+      const nextStoredUser = { ...storedUser, ...savedProfile };
       const storage = localStorage.getItem("dwumaToken") ? localStorage : sessionStorage;
       storage.setItem("dwumaUser", JSON.stringify(nextStoredUser));
-      localStorage.setItem("dwumaOnboardingData", JSON.stringify({ ...onboarding, fieldOfStudy: payload.fieldOfStudy, skills: nextSkills }));
+      localStorage.setItem("dwumaOnboardingData", JSON.stringify({ ...onboarding, fieldOfStudy: payload.fieldOfStudy, fieldOfWork: payload.fieldOfStudy, location: payload.location, skills: nextSkills }));
       setIsEditing(false);
     } catch (error) {
       setEditMessage(error.message);
@@ -261,8 +259,6 @@ function Profile() {
               <label>Phone Number<input type="tel" name="phoneNumber" value={editForm.phoneNumber} onChange={handleEditChange} /></label>
               <label>Location<input name="location" value={editForm.location} onChange={handleEditChange} /></label>
               <label>Field of Study<input name="fieldOfStudy" value={editForm.fieldOfStudy} onChange={handleEditChange} /></label>
-              <label>Education<input name="education" value={editForm.education} onChange={handleEditChange} /></label>
-              <label className="profile-edit-wide">LinkedIn<input type="url" name="linkedin" value={editForm.linkedin} onChange={handleEditChange} placeholder="https://linkedin.com/in/your-profile" /></label>
               <label className="profile-edit-wide">Skills<input name="skills" value={editForm.skills} onChange={handleEditChange} placeholder="React, JavaScript, Python" /><small>Separate skills with commas.</small></label>
               {editMessage && <p className="profile-edit-message" role="alert">{editMessage}</p>}
               <div className="profile-edit-actions"><button type="button" className="secondary-button" onClick={() => setIsEditing(false)} disabled={isSaving}>Cancel</button><button type="submit" className="primary-button" disabled={isSaving}><Save size={15} />{isSaving ? "Saving..." : "Save Changes"}</button></div>

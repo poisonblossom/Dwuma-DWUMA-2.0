@@ -7,7 +7,14 @@ import {
 
 import { useLocation } from "wouter";
 
-function RecommendedJobs({ jobs = [] }) {
+function valueOf(job, ...keys) {
+  for (const key of keys) {
+    if (job?.[key] !== undefined && job[key] !== null && job[key] !== "") return job[key];
+  }
+  return "";
+}
+
+function RecommendedJobs({ jobs = [], loading = false, error = "" }) {
   const [, navigate] = useLocation();
 
   const hasJobs =
@@ -17,8 +24,9 @@ function RecommendedJobs({ jobs = [] }) {
     navigate("/dashboard/jobs");
   }
 
-  function handleViewJob(jobId) {
-    navigate(`/dashboard/jobs/${jobId}`);
+  function handleViewJob(job) {
+    sessionStorage.setItem("dwumaSelectedJob", JSON.stringify(job));
+    navigate(`/dashboard/jobs/${valueOf(job, "id", "jobId", "externalId")}`);
   }
 
   return (
@@ -40,17 +48,26 @@ function RecommendedJobs({ jobs = [] }) {
 
       {hasJobs ? (
         <div className="jobs-list">
-          {jobs.map((job) => (
+          {jobs.map((job, index) => {
+            const id = valueOf(job, "id", "jobId", "externalId");
+            const title = valueOf(job, "title", "jobTitle", "position") || "Untitled role";
+            const company = valueOf(job, "company", "companyName", "employer") || "Company";
+            const location = valueOf(job, "location", "city") || "Location not specified";
+            const type = valueOf(job, "jobType", "type", "employmentType") || "Job";
+            const workMode = job.isRemote === true ? "Remote" : valueOf(job, "workMode", "workArrangement");
+            const logoUrl = valueOf(job, "logoUrl", "companyLogoUrl");
+
+            return (
             <article
-              key={job.id}
+              key={id || `${title}-${index}`}
               className="job-row"
             >
               <div className="job-main-details">
                 <div className="job-company-logo">
-                  {job.logoUrl ? (
+                  {logoUrl ? (
                     <img
-                      src={job.logoUrl}
-                      alt={`${job.company} logo`}
+                      src={logoUrl}
+                      alt={`${company} logo`}
                     />
                   ) : (
                     <Building2
@@ -61,8 +78,8 @@ function RecommendedJobs({ jobs = [] }) {
                 </div>
 
                 <div>
-                  <h3>{job.title}</h3>
-                  <p>{job.company}</p>
+                  <h3>{title}</h3>
+                  <p>{company}</p>
                 </div>
               </div>
 
@@ -73,7 +90,7 @@ function RecommendedJobs({ jobs = [] }) {
                     aria-hidden="true"
                   />
 
-                  {job.location}
+                  {location}
                 </span>
 
                 <span>
@@ -82,13 +99,13 @@ function RecommendedJobs({ jobs = [] }) {
                     aria-hidden="true"
                   />
 
-                  {job.type}
+                  {type}
                 </span>
               </div>
 
-              {job.workMode && (
+              {workMode && (
                 <span className="job-work-mode">
-                  {job.workMode}
+                  {workMode}
                 </span>
               )}
 
@@ -96,13 +113,14 @@ function RecommendedJobs({ jobs = [] }) {
                 type="button"
                 className="job-view-button"
                 onClick={() =>
-                  handleViewJob(job.id)
+                  handleViewJob(job)
                 }
               >
                 View job
               </button>
             </article>
-          ))}
+            );
+          })}
         </div>
       ) : (
         <div className="jobs-empty-state">
@@ -113,11 +131,12 @@ function RecommendedJobs({ jobs = [] }) {
             />
           </div>
 
-          <h3>No recommended jobs available</h3>
+          <h3>{loading ? "Finding recommended jobs" : "No recommended jobs available"}</h3>
 
           <p>
-            Job recommendations will appear here when
-            they are returned by the backend.
+            {loading
+              ? "Searching for roles that match your preferences."
+              : error || "No matching roles were returned for your role and location."}
           </p>
         </div>
       )}

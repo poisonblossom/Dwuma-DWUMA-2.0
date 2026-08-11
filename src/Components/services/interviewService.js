@@ -97,3 +97,206 @@ export function getCachedInterviewResult() {
 export function hasActiveInterview() {
   return localStorage.getItem(ACTIVE_INTERVIEW_KEY) === "true";
 }
+
+export async function uploadInterviewVideoSession({
+  sessionId,
+  jobTitle,
+  companyName,
+  jobDescription,
+  videoBlob,
+  questionTimings,
+}) {
+  const token =
+    localStorage.getItem("dwumaToken") ||
+    sessionStorage.getItem("dwumaToken");
+
+  if (!token) {
+    throw new Error(
+      "Your login session has expired. Please sign in again."
+    );
+  }
+
+  if (!sessionId) {
+    throw new Error(
+      "Interview session ID is missing."
+    );
+  }
+
+  if (!videoBlob?.size) {
+    throw new Error(
+      "Interview recording is missing."
+    );
+  }
+
+  const formData =
+    new FormData();
+
+  formData.append(
+    "SessionId",
+    String(sessionId)
+  );
+
+  formData.append(
+    "JobTitle",
+    jobTitle || ""
+  );
+
+  formData.append(
+    "CompanyName",
+    companyName || ""
+  );
+
+  formData.append(
+    "JobDescription",
+    jobDescription || ""
+  );
+
+  formData.append(
+    "QuestionTimingsJson",
+    JSON.stringify(
+      questionTimings || []
+    )
+  );
+
+  formData.append(
+    "VideoFile",
+    videoBlob,
+    "interview.webm"
+  );
+
+  console.log(
+    "Uploading interview video:",
+    {
+      sessionId,
+      jobTitle,
+      companyName,
+      jobDescription,
+      videoSize: videoBlob.size,
+      videoType: videoBlob.type,
+      questionTimings,
+    }
+  );
+
+  const response =
+    await fetch(
+      `${API_BASE_URL}/interview/video-session`,
+      {
+        method: "POST",
+
+        headers: {
+          Authorization:
+            `Bearer ${token}`,
+        },
+
+        body:
+          formData,
+      }
+    );
+
+  const data =
+    await response
+      .json()
+      .catch(() => null);
+
+  if (!response.ok) {
+    console.error(
+      "Video session upload failed:",
+      {
+        status:
+          response.status,
+
+        data,
+      }
+    );
+
+    if (data?.errors) {
+      const messages =
+        Object.entries(
+          data.errors
+        ).flatMap(
+          ([field, values]) =>
+            (Array.isArray(values)
+              ? values
+              : [values]
+            ).map(
+              (message) =>
+                `${field}: ${message}`
+            )
+        );
+
+      if (messages.length) {
+        throw new Error(
+          messages.join(" | ")
+        );
+      }
+    }
+
+    throw new Error(
+      data?.message ||
+      data?.title ||
+      `Interview video upload failed (${response.status}).`
+    );
+  }
+
+  return data;
+}
+
+export async function transcribeInterviewAnswer(
+  audioBlob
+) {
+  const token =
+    localStorage.getItem("dwumaToken") ||
+    sessionStorage.getItem("dwumaToken");
+
+  if (!token) {
+    throw new Error(
+      "Your login session has expired."
+    );
+  }
+
+  if (!audioBlob?.size) {
+    throw new Error(
+      "The answer recording is empty."
+    );
+  }
+
+  const formData =
+    new FormData();
+
+  formData.append(
+    "audioFile",
+    audioBlob,
+    "answer.webm"
+  );
+
+  const response =
+    await fetch(
+      `${API_BASE_URL}/interview/transcribe-answer`,
+      {
+        method: "POST",
+
+        headers: {
+          Authorization:
+            `Bearer ${token}`,
+        },
+
+        body:
+          formData,
+      }
+    );
+
+  const data =
+    await response
+      .json()
+      .catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(
+      data?.message ||
+      data?.title ||
+      `Answer transcription failed (${response.status}).`
+    );
+  }
+
+  return data;
+}

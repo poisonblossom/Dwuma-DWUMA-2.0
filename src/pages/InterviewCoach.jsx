@@ -1,20 +1,18 @@
+import interviewerAvatar from "../assets/interviewer-avatar.png";
 import { useEffect, useMemo, useRef, useState } from "react";
 import {
   ArrowLeft,
   ArrowRight,
   BriefcaseBusiness,
   CheckCircle2,
-  ChevronRight,
   CircleAlert,
   Lightbulb,
   LoaderCircle,
   MessageSquareText,
-  Mic,
   Pause,
   Play,
   RotateCcw,
   Sparkles,
-  Square,
   Target,
   Trophy,
   Volume2,
@@ -23,15 +21,14 @@ import {
 
 import DashboardLayout from "../Components/dashboard/DashboardLayout";
 import {
-  evaluateInterviewAnswer,
   generateInterviewQuestions,
+  evaluateInterviewAnswer,
   completeInterview,
   cacheCompletedInterview,
   clearCachedInterviewResult,
+  uploadInterviewVideoSession,
+  transcribeInterviewAnswer,
 } from "../Components/services/interviewService";
-import {
-  evaluateVoiceInterviewAnswer,
-} from "../Components/services/audioService";
 import "../Components/dashboard/Dashboard.css";
 import "./InterviewCoach.css";
 
@@ -90,6 +87,8 @@ function ScoreRing({ score, label = "Answer score" }) {
   );
 }
 
+
+
 function InterviewCoach() {
   const restored = useMemo(() => restoreSession(), []);
   const restoredReviewedAnswer =
@@ -114,43 +113,477 @@ function InterviewCoach() {
   );
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [recordingState, setRecordingState] = useState("idle");
-  const [recordingSeconds, setRecordingSeconds] = useState(0);
   const [speechState, setSpeechState] = useState("idle");
-  const mediaRecorderRef = useRef(null);
-  const microphoneStreamRef = useRef(null);
-  const recordingChunksRef = useRef([]);
-  const discardRecordingRef = useRef(false);
-  const recordingTimerRef = useRef(null);
+  const [cameraEnabled, setCameraEnabled] =  useState(false);
+  const [cameraError, setCameraError] =  useState("");
+  const [sessionRecording, setSessionRecording] =  useState(false);
+  const [sessionRecordingSeconds, setSessionRecordingSeconds] =  useState(0);
+  const [recordedSessionBlob, setRecordedSessionBlob] =  useState(null);
+  const [recordedSessionUrl, setRecordedSessionUrl] =  useState("");
+  const [questionTimings, setQuestionTimings] = useState([]);
+  const [microphoneEnabled, setMicrophoneEnabled] = useState(false);
+  const [answerRecording, setAnswerRecording] = useState(false);
+  const [processingStage, setProcessingStage] = useState("idle");
+  const [processingCurrent, setProcessingCurrent] = useState(0);
+  const [processingTotal, setProcessingTotal] = useState(0);
+
+  const videoRef = useRef(null);
+  const cameraStreamRef = useRef(null);
   const utteranceRef = useRef(null);
-  const transcriptionRequestRef = useRef(null);
+  const sessionRecorderRef =  useRef(null);
+  const sessionChunksRef =  useRef([]);
+  const sessionTimerRef =  useRef(null);
+  const sessionStreamRef =  useRef(null);
+  const sessionStartedAtRef = useRef(null);
+  const answerStartedAtRef = useRef(null);
+  const questionStartedAtRef = useRef(null);
+  const recordingStopResolverRef = useRef(null);
+  const answerAudioRecorderRef = useRef(null);
+  const answerAudioChunksRef = useRef([]);
+  const answerAudioBlobsRef = useRef([]);
 
   const currentQuestion = questions[currentIndex];
+  const interviewerSpeaking = speechState === "playing";
+  const interviewerPaused = speechState === "paused";
   const completedCount = answers.length;
-  const averageScore = completedCount
-    ? Math.round(answers.reduce((sum, item) => sum + Number(item.feedback.score || 0), 0) / completedCount)
+  const evaluatedAnswers =
+  answers.filter(
+    (item) =>
+      item.feedback &&
+      Number.isFinite(
+        Number(
+          item.feedback.score
+        )
+      )
+  );
+
+const averageScore =
+  evaluatedAnswers.length
+    ? Math.round(
+        evaluatedAnswers.reduce(
+          (sum, item) =>
+            sum +
+            Number(
+              item.feedback.score
+            ),
+          0
+        ) /
+          evaluatedAnswers.length
+      )
     : 0;
 
   useEffect(() => {
-    if (!questions.length || phase === "setup") return;
-    persistSession({
-      setup,
-      sessionId,
-      questions,
-      answers,
-      currentIndex,
-      draftAnswer: answer,
-      feedback,
-      phase,
-    });
-  }, [setup, sessionId, questions, answers, currentIndex, answer, feedback, phase]);
+  return () => {
+    clearInterval(
+      sessionTimerRef.current
+    );
 
-  useEffect(() => () => {
-    clearInterval(recordingTimerRef.current);
-    transcriptionRequestRef.current?.abort();
-    window.speechSynthesis?.cancel();
-    microphoneStreamRef.current?.getTracks().forEach((track) => track.stop());
-  }, []);
+    window.speechSynthesis
+      ?.cancel();
+
+    if (
+      sessionRecorderRef.current &&
+      sessionRecorderRef.current.state !==
+        "inactive"
+    ) {
+      sessionRecorderRef.current.stop();
+    }
+
+    sessionStreamRef.current
+      ?.getTracks()
+      .forEach((track) =>
+        track.stop()
+      );
+
+    cameraStreamRef.current
+      ?.getTracks()
+      .forEach((track) =>
+        track.stop()
+      );
+  };
+}, []);
+
+useEffect(() => {
+  if (
+    phase !== "interview" ||
+    interviewerSpeaking ||
+    !microphoneEnabled ||
+    answerRecording
+  ) {
+    return;
+  }
+
+  const recorder =
+    answerAudioRecorderRef.current;
+
+  if (
+    recorder &&
+    recorder.state !== "inactive"
+  ) {
+    return;
+  }
+
+  const timer =
+    setTimeout(() => {
+      console.log(
+        "Starting answer recorder from fallback effect"
+      );
+
+      startAnswerAudioRecording();
+    }, 250);
+
+  return () => {
+    clearTimeout(timer);
+  };
+}, [
+  phase,
+  interviewerSpeaking,
+  microphoneEnabled,
+  answerRecording,
+  currentIndex,
+]);
+
+useEffect(() => {
+  if (
+    !cameraEnabled ||
+    !videoRef.current ||
+    !cameraStreamRef.current
+  ) {
+    return;
+  }
+
+  const videoElement =
+    videoRef.current;
+
+  videoElement.srcObject =
+    cameraStreamRef.current;
+
+  videoElement
+    .play()
+    .catch((error) => {
+      console.error(
+        "Unable to play camera preview:",
+        error
+      );
+    });
+
+  return () => {
+    if (videoElement) {
+      videoElement.srcObject = null;
+    }
+  };
+}, [cameraEnabled]);
+
+
+async function startInterviewSession() {
+  setCameraError("");
+
+  if (
+    !navigator.mediaDevices?.getUserMedia
+  ) {
+    setCameraError(
+      "Camera and microphone access are not supported by this browser."
+    );
+
+    return;
+  }
+
+  try {
+    const stream =
+      await navigator.mediaDevices.getUserMedia({
+        video: {
+          facingMode: "user",
+          width: {
+            ideal: 1280,
+          },
+          height: {
+            ideal: 720,
+          },
+        },
+
+        audio: true,
+      });
+
+      const videoTracks =
+        stream.getVideoTracks();
+
+      const audioTracks =
+        stream.getAudioTracks();
+
+      console.log(
+        "Video tracks:",
+        videoTracks
+      );
+
+      console.log(
+        "Audio tracks:",
+        audioTracks
+      );
+
+      if (videoTracks.length === 0) {
+        throw new Error(
+          "No camera video track was provided."
+        );
+      }
+
+      if (audioTracks.length === 0) {
+        throw new Error(
+          "No microphone audio track was provided."
+        );
+      }
+
+      setMicrophoneEnabled(true);
+
+    sessionStreamRef.current =
+      stream;
+
+    cameraStreamRef.current =
+      stream;
+
+    setCameraEnabled(true);
+
+    sessionChunksRef.current = [];
+
+    let options = {};
+
+    if (
+      MediaRecorder.isTypeSupported(
+        "video/webm;codecs=vp9,opus"
+      )
+    ) {
+      options.mimeType =
+        "video/webm;codecs=vp9,opus";
+    } else if (
+      MediaRecorder.isTypeSupported(
+        "video/webm;codecs=vp8,opus"
+      )
+    ) {
+      options.mimeType =
+        "video/webm;codecs=vp8,opus";
+    } else if (
+      MediaRecorder.isTypeSupported(
+        "video/webm"
+      )
+    ) {
+      options.mimeType =
+        "video/webm";
+    }
+
+    console.log(
+  "Recording stream:",
+  {
+    videoTracks:
+      stream
+        .getVideoTracks()
+        .map((track) => ({
+          label: track.label,
+          enabled: track.enabled,
+          readyState:
+            track.readyState,
+        })),
+
+    audioTracks:
+      stream
+        .getAudioTracks()
+        .map((track) => ({
+          label: track.label,
+          enabled: track.enabled,
+          readyState:
+            track.readyState,
+        })),
+  }
+);
+
+    const recorder =
+      new MediaRecorder(
+        stream,
+        options
+      );
+
+    sessionRecorderRef.current =
+      recorder;
+
+    recorder.ondataavailable =
+      (event) => {
+        if (event.data.size > 0) {
+          sessionChunksRef.current.push(
+            event.data
+          );
+        }
+      };
+
+    recorder.onstop = () => {
+  const blob =
+    new Blob(
+      sessionChunksRef.current,
+      {
+        type:
+          recorder.mimeType ||
+          "video/webm",
+      }
+    );
+
+  setRecordedSessionBlob(
+    blob
+  );
+
+  setRecordedSessionUrl(
+    (currentUrl) => {
+      if (currentUrl) {
+        URL.revokeObjectURL(
+          currentUrl
+        );
+      }
+
+      return URL.createObjectURL(
+        blob
+      );
+    }
+  );
+
+  if (
+    recordingStopResolverRef.current
+  ) {
+    recordingStopResolverRef.current(
+      blob
+    );
+
+    recordingStopResolverRef.current =
+      null;
+  }
+};
+
+    sessionStartedAtRef.current = performance.now();
+
+    setQuestionTimings([]);
+
+    recorder.start(1000);
+
+    setSessionRecording(true);
+    setSessionRecordingSeconds(0);
+
+    clearInterval(
+      sessionTimerRef.current
+    );
+
+    sessionTimerRef.current =
+      setInterval(() => {
+        setSessionRecordingSeconds(
+          (previous) =>
+            previous + 1
+        );
+      }, 1000);
+  } catch (error) {
+    console.error(
+      "Unable to start interview session:",
+      error
+    );
+
+    setSessionRecording(false);
+
+    if (
+      error.name ===
+      "NotAllowedError"
+    ) {
+      setCameraError(
+        "Camera or microphone permission was denied."
+      );
+
+      return;
+    }
+
+    if (
+      error.name ===
+      "NotFoundError"
+    ) {
+      setCameraError(
+        "A camera or microphone could not be found."
+      );
+
+      return;
+    }
+
+    setCameraError(
+      "Unable to start the video interview."
+    );
+  }
+}
+
+function getSessionElapsedSeconds() {
+  if (!sessionStartedAtRef.current) {
+    return 0;
+  }
+
+  return Number(
+    (
+      (
+        performance.now() -
+        sessionStartedAtRef.current
+      ) /
+      1000
+    ).toFixed(2)
+  );
+}
+
+async function endInterviewSession() {
+  clearInterval(
+    sessionTimerRef.current
+  );
+
+  sessionTimerRef.current =
+    null;
+
+  setSessionRecording(false);
+
+  stopCoachAudio();
+
+  let finalBlob = null;
+
+  if (
+    sessionRecorderRef.current &&
+    sessionRecorderRef.current.state !==
+      "inactive"
+  ) {
+    finalBlob =
+      await new Promise(
+        (resolve) => {
+          recordingStopResolverRef.current =
+            resolve;
+
+          sessionRecorderRef.current.stop();
+        }
+      );
+  } else {
+    finalBlob =
+      recordedSessionBlob;
+  }
+
+  sessionStreamRef.current
+    ?.getTracks()
+    .forEach(
+      (track) =>
+        track.stop()
+    );
+
+    setMicrophoneEnabled(false);
+
+  sessionStreamRef.current =
+    null;
+
+  cameraStreamRef.current =
+    null;
+
+  if (videoRef.current) {
+    videoRef.current.srcObject =
+      null;
+  }
+
+  setCameraEnabled(false);
+
+  return finalBlob;
+}
+
+
 
   function stopCoachAudio() {
     window.speechSynthesis?.cancel();
@@ -170,6 +603,23 @@ function InterviewCoach() {
     setSpeechState("playing");
   }
 
+
+
+function formatVideoTime(seconds) {
+  const minutes =
+    Math.floor(seconds / 60);
+
+  const remainingSeconds =
+    seconds % 60;
+
+  return `${String(minutes).padStart(
+    2,
+    "0"
+  )}:${String(
+    remainingSeconds
+  ).padStart(2, "0")}`;
+}
+
   function playCoachAudio(text) {
     stopCoachAudio();
     setError("");
@@ -182,8 +632,16 @@ function InterviewCoach() {
     utterance.rate = 0.95;
     utterance.pitch = 1;
     utterance.onend = () => {
-      if (utteranceRef.current === utterance) {
-        utteranceRef.current = null;
+      if (
+        utteranceRef.current ===
+        utterance
+      ) {
+        utteranceRef.current =
+          null;
+
+        answerStartedAtRef.current =
+          getSessionElapsedSeconds();
+
         setSpeechState("idle");
       }
     };
@@ -196,134 +654,78 @@ function InterviewCoach() {
       }
     };
     utteranceRef.current = utterance;
+    questionStartedAtRef.current = getSessionElapsedSeconds();
     window.speechSynthesis.speak(utterance);
     setSpeechState("playing");
   }
 
-  function releaseMicrophone() {
-    clearInterval(recordingTimerRef.current);
-    recordingTimerRef.current = null;
-    microphoneStreamRef.current?.getTracks().forEach((track) => track.stop());
-    microphoneStreamRef.current = null;
-    mediaRecorderRef.current = null;
+
+
+  async function stopAnswerAudioRecording() {
+  const recorder =
+    answerAudioRecorderRef.current;
+
+  if (
+    !recorder ||
+    recorder.state === "inactive"
+  ) {
+    setAnswerRecording(false);
+    return null;
   }
 
-  async function startRecording() {
-    if (feedback || recordingState === "transcribing") return;
-    if (!navigator.mediaDevices?.getUserMedia || !window.MediaRecorder) {
-      setError("Audio recording is not supported by this browser. You can still type your answer.");
-      return;
+  return await new Promise(
+    (resolve, reject) => {
+      recorder.onstop = () => {
+        const blob =
+          new Blob(
+            answerAudioChunksRef.current,
+            {
+              type:
+                recorder.mimeType ||
+                "audio/webm",
+            }
+          );
+
+        answerAudioRecorderRef.current =
+          null;
+
+        answerAudioChunksRef.current =
+          [];
+
+        setAnswerRecording(false);
+
+        console.log(
+          "Answer audio created:",
+          {
+            size: blob.size,
+            type: blob.type,
+          }
+        );
+
+        resolve(blob);
+      };
+
+      recorder.onerror = () => {
+        setAnswerRecording(false);
+
+        reject(
+          new Error(
+            "The answer recorder failed."
+          )
+        );
+      };
+
+      if (
+        recorder.state === "recording"
+      ) {
+        recorder.requestData();
+      }
+
+      recorder.stop();
     }
-    stopCoachAudio();
-    setError("");
-    try {
-      const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-      const recorder = new MediaRecorder(stream);
-      discardRecordingRef.current = false;
-      microphoneStreamRef.current = stream;
-      mediaRecorderRef.current = recorder;
-      recordingChunksRef.current = [];
-      recorder.addEventListener("dataavailable", (event) => {
-        if (event.data.size) recordingChunksRef.current.push(event.data);
-      });
-      recorder.addEventListener("stop", async () => {
-        const recordingType = (recorder.mimeType || "audio/webm")
-          .split(";", 1)[0]
-          .trim()
-          .toLowerCase();
-        const audioBlob = new Blob(recordingChunksRef.current, {
-          type: recordingType,
-        });
-        recordingChunksRef.current = [];
-        releaseMicrophone();
-        if (discardRecordingRef.current) {
-          discardRecordingRef.current = false;
-          return;
-        }
-        if (!audioBlob.size) {
-          setRecordingState("idle");
-          setError("No audio was recorded. Please try again.");
-          return;
-        }
-        setRecordingState("transcribing");
-        const controller = new AbortController();
-        transcriptionRequestRef.current = controller;
-        try {
-          const result = await evaluateVoiceInterviewAnswer({
-            sessionId,
-            questionId: currentQuestion.id,
-            jobTitle: setup.jobTitle,
-            companyName: setup.companyName,
-            jobDescription: setup.jobDescription,
-            question: currentQuestion.question,
-            audioBlob,
-          }, { signal: controller.signal });
-          if (!controller.signal.aborted) {
-            setAnswer(result.transcription.slice(0, MAX_ANSWER_LENGTH));
-            setFeedback(result.feedback);
-            setAnswers((current) => [...current, {
-              question: currentQuestion,
-              answer: result.transcription,
-              feedback: result.feedback,
-            }]);
-            setRecordingState("ready");
-          }
-        } catch (requestError) {
-          if (requestError.name !== "AbortError") {
-            setRecordingState("error");
-            setError(requestError.message);
-          }
-        } finally {
-          if (transcriptionRequestRef.current === controller) {
-            transcriptionRequestRef.current = null;
-          }
-        }
-      }, { once: true });
-      recorder.start();
-      setRecordingSeconds(0);
-      setRecordingState("recording");
-      recordingTimerRef.current = setInterval(() => {
-        setRecordingSeconds((seconds) => {
-          const next = seconds + 1;
-          if (next >= MAX_RECORDING_SECONDS && recorder.state === "recording") {
-            recorder.stop();
-          }
-          return next;
-        });
-      }, 1000);
-    } catch (requestError) {
-      releaseMicrophone();
-      setRecordingState("error");
-      setError(
-        requestError.name === "NotAllowedError"
-          ? "Microphone access was denied. You can allow it in your browser settings or type your answer."
-          : "The microphone could not be started. Please try again or type your answer.",
-      );
-    }
-  }
+  );
+}
 
-  function stopRecording() {
-    const recorder = mediaRecorderRef.current;
-    if (recorder?.state === "recording") recorder.stop();
-  }
-
-  function clearVoiceActivity() {
-    stopCoachAudio();
-    transcriptionRequestRef.current?.abort();
-    transcriptionRequestRef.current = null;
-    if (mediaRecorderRef.current?.state === "recording") {
-      discardRecordingRef.current = true;
-      mediaRecorderRef.current.stop();
-    }
-    releaseMicrophone();
-    recordingChunksRef.current = [];
-    setRecordingSeconds(0);
-    setRecordingState("idle");
-  }
-
-  function formatRecordingTime(seconds) {
-    return `${String(Math.floor(seconds / 60)).padStart(2, "0")}:${String(seconds % 60).padStart(2, "0")}`;
-  }
 
   function updateSetup(event) {
     const { name, value } = event.target;
@@ -333,6 +735,121 @@ function InterviewCoach() {
     }));
     setError("");
   }
+
+  function startAnswerAudioRecording() {
+  if (
+    answerAudioRecorderRef.current &&
+    answerAudioRecorderRef.current.state !==
+      "inactive"
+  ) {
+    return;
+  }
+
+  const stream =
+    sessionStreamRef.current;
+
+  if (!stream) {
+    console.error(
+      "Interview stream is unavailable."
+    );
+
+    setError(
+      "The microphone recording could not start."
+    );
+
+    return;
+  }
+
+  const audioTracks =
+    stream.getAudioTracks();
+
+  if (!audioTracks.length) {
+    console.error(
+      "No microphone track is available."
+    );
+
+    setError(
+      "No microphone is available."
+    );
+
+    return;
+  }
+
+  const audioStream =
+    new MediaStream(audioTracks);
+
+  answerAudioChunksRef.current = [];
+
+  let options = {};
+
+  if (
+    MediaRecorder.isTypeSupported(
+      "audio/webm;codecs=opus"
+    )
+  ) {
+    options.mimeType =
+      "audio/webm;codecs=opus";
+  } else if (
+    MediaRecorder.isTypeSupported(
+      "audio/webm"
+    )
+  ) {
+    options.mimeType =
+      "audio/webm";
+  }
+
+  try {
+    const recorder =
+      new MediaRecorder(
+        audioStream,
+        options
+      );
+
+    recorder.ondataavailable =
+      (event) => {
+        if (event.data.size > 0) {
+          answerAudioChunksRef.current
+            .push(event.data);
+        }
+      };
+
+    recorder.onerror = (event) => {
+      console.error(
+        "Answer recorder error:",
+        event
+      );
+
+      setAnswerRecording(false);
+
+      setError(
+        "The answer recording stopped unexpectedly."
+      );
+    };
+
+    answerAudioRecorderRef.current =
+      recorder;
+
+    recorder.start(500);
+
+    setAnswerRecording(true);
+
+    console.log(
+      "Answer audio recording started:",
+      recorder.state
+    );
+  } catch (recordingError) {
+    console.error(
+      "Unable to start answer recording:",
+      recordingError
+    );
+
+    setAnswerRecording(false);
+
+    setError(
+      "Unable to start recording your answer."
+    );
+  }
+}
 
   async function startInterview(event) {
     event.preventDefault();
@@ -355,6 +872,14 @@ function InterviewCoach() {
       if (!Array.isArray(result?.questions) || !result.questions.length) {
         throw new Error("No interview questions were returned. Please try again.");
       }
+
+      answerAudioBlobsRef.current = [];
+      answerAudioChunksRef.current = [];
+      answerAudioRecorderRef.current = null;
+      setAnswerRecording(false);
+
+      await startInterviewSession();
+
       const nextSetup = {
         ...setup,
         jobTitle: result.jobTitle || setup.jobTitle,
@@ -390,101 +915,556 @@ function InterviewCoach() {
     }
   }
 
-  async function submitAnswer(event) {
-    event.preventDefault();
-    if (feedback) return;
-    const cleanAnswer = answer.trim();
-    if (cleanAnswer.length < 10) {
-      setError("Give your coach a little more detail before submitting.");
+  async function finishInterview(
+  finalAnswers,
+  finalQuestionTimings
+) {
+  setLoading(true);
+setError("");
+setPhase("processing");
+
+setProcessingStage("recording");
+setProcessingCurrent(0);
+setProcessingTotal(finalAnswers.length);
+
+try {
+    // Stop recording and wait until the
+    // complete WebM blob has been created.
+    setPhase("processing");
+    const videoBlob =
+      await endInterviewSession();
+
+    if (!videoBlob?.size) {
+      throw new Error(
+        "The interview recording could not be created."
+      );
+    }
+    
+    setProcessingStage("uploading");
+    // Upload the complete interview video
+    // together with all question timings.
+    const uploadResult =
+      await uploadInterviewVideoSession({
+        sessionId,
+
+        jobTitle:
+          setup.jobTitle,
+
+        companyName:
+          setup.companyName,
+
+        jobDescription:
+          setup.jobDescription,
+
+        videoBlob,
+
+        questionTimings:
+          finalQuestionTimings,
+      });
+
+      console.log(
+  "Full interview video uploaded:",
+  uploadResult
+);
+
+const recordedAnswers =
+  answerAudioBlobsRef.current;
+
+if (
+  recordedAnswers.length !==
+  finalAnswers.length
+) {
+  throw new Error(
+    "Some interview answer recordings are missing."
+  );
+}
+
+setProcessingStage("transcribing");
+setProcessingCurrent(0);
+
+const transcribedAnswers = [];
+
+for (const recordedAnswer of recordedAnswers) {
+  console.log(
+    `Transcribing answer ${recordedAnswer.questionNumber}...`
+  );
+
+  const result =
+    await transcribeInterviewAnswer(
+      recordedAnswer.blob
+    );
+
+  transcribedAnswers.push({
+    questionId:
+      recordedAnswer.questionId,
+
+    questionNumber:
+      recordedAnswer.questionNumber,
+
+    question:
+      recordedAnswer.question,
+
+    transcript:
+      result?.transcript || "",
+  });
+}
+
+console.log(
+  "Audio transcripts:",
+  transcribedAnswers
+);
+
+
+const answersWithTranscripts =
+  finalAnswers.map(
+    (item, index) => {
+      const transcription =
+        transcribedAnswers.find(
+          (entry) =>
+            entry.questionNumber ===
+              index + 1
+        );
+
+      return {
+        ...item,
+
+        transcript:
+          transcription?.transcript
+            ?.trim() || "",
+
+        feedback:
+          null,
+      };
+    }
+  );
+
+  console.log(
+  "Evaluating transcribed answers..."
+);
+
+setProcessingStage("evaluating");
+setProcessingCurrent(0);
+
+const evaluatedResults = [];
+
+for (
+  let index = 0;
+  index < answersWithTranscripts.length;
+  index++
+) {
+
+  setProcessingCurrent(index + 1);
+  const item =
+    answersWithTranscripts[index];
+
+  const transcript =
+    item.transcript?.trim();
+
+  if (!transcript) {
+    evaluatedResults.push({
+      ...item,
+      feedback: {
+        score: 0,
+        overallAssessment:
+          "No spoken answer was captured.",
+        strengths: [],
+        improvements: [
+          "Provide a spoken response to this question.",
+        ],
+        improvedAnswer: "",
+        deliveryTip:
+          "Take a moment to organise your thoughts before answering.",
+      },
+    });
+
+    continue;
+  }
+
+  console.log(
+    `Evaluating answer ${index + 1}...`
+  );
+
+  const evaluation =
+    await evaluateInterviewAnswer({
+      sessionId,
+
+      questionId:
+        item.question.id,
+
+      jobTitle:
+        setup.jobTitle,
+
+      companyName:
+        setup.companyName,
+
+      jobDescription:
+        setup.jobDescription,
+
+      question:
+        item.question.question,
+
+      candidateAnswer:
+        transcript,
+    });
+
+  evaluatedResults.push({
+    ...item,
+    feedback:
+      evaluation,
+  });
+}
+
+setProcessingStage("finalizing");
+setProcessingCurrent(
+  finalAnswers.length
+);
+
+console.log(
+  "Evaluated interview answers:",
+  evaluatedResults
+);
+
+console.log(
+  "Merged interview answers:",
+  answersWithTranscripts
+);
+
+    // Keep existing completion call for now.
+    const completion =
+      await completeInterview(
+        sessionId
+      );
+
+    const scoredAnswers =
+  evaluatedResults.filter(
+    (item) =>
+      Number.isFinite(
+        Number(
+          item.feedback?.score
+        )
+      )
+  );
+
+const calculatedAverage =
+  scoredAnswers.length
+    ? Math.round(
+        scoredAnswers.reduce(
+          (sum, item) =>
+            sum +
+            Number(
+              item.feedback.score
+            ),
+          0
+        ) /
+          scoredAnswers.length
+      )
+    : 0;
+
+    const finalResult = {
+        ...completion,
+
+        completed: true,
+
+        score:
+          calculatedAverage,
+
+        role:
+          setup.jobTitle,
+
+        company:
+          setup.companyName,
+
+        message:
+          `${setup.jobTitle} interview completed`,
+
+        feedback:
+          `Final evaluation based on all ${evaluatedResults.length} interview questions.`,
+
+        answers:
+          evaluatedResults,
+
+        videoUploaded:
+          true,
+      };
+
+    cacheCompletedInterview(
+      finalResult
+    );
+
+    persistSession({
+        setup,
+        sessionId,
+        questions,
+
+        answers:
+          evaluatedResults,
+
+        currentIndex:
+          questions.length - 1,
+
+        draftAnswer: "",
+
+        feedback: null,
+
+        phase: "complete",
+      });
+
+      setAnswers(
+        evaluatedResults
+      );
+
+
+      setProcessingStage("complete");
+    setPhase("complete");
+  } catch (requestError) {
+    console.error(
+      "Interview completion error:",
+      requestError
+    );
+
+    setError(
+      requestError.message ||
+        "Unable to complete the interview."
+    );
+  } finally {
+    setLoading(false);
+  }
+}
+
+  async function submitSpokenAnswer() {
+  if (
+    interviewerSpeaking ||
+    !microphoneEnabled
+  ) {
+    return;
+  }
+
+  setLoading(true);
+  setError("");
+
+  try {
+    const answerAudioBlob =
+      await stopAnswerAudioRecording();
+
+    if (!answerAudioBlob?.size) {
+      throw new Error(
+        "Your spoken answer could not be recorded."
+      );
+    }
+
+    const answerEndedAt =
+      getSessionElapsedSeconds();
+
+    const answerStartedAt =
+      answerStartedAtRef.current ??
+      answerEndedAt;
+
+    const questionTiming = {
+      questionId:
+        currentQuestion.id,
+
+      questionNumber:
+        currentIndex + 1,
+
+      question:
+        currentQuestion.question,
+
+      questionStartedAt:
+        questionStartedAtRef.current ??
+        0,
+
+      answerStartedAt,
+
+      answerEndedAt,
+
+      duration:
+        Number(
+          (
+            answerEndedAt -
+            answerStartedAt
+          ).toFixed(2)
+        ),
+    };
+
+    const finalQuestionTimings = [
+      ...questionTimings,
+      questionTiming,
+    ];
+
+    setQuestionTimings(
+      finalQuestionTimings
+    );
+
+    answerStartedAtRef.current =
+      null;
+
+    questionStartedAtRef.current =
+      null;
+
+    // Store the question locally.
+    // Transcript/evaluation will be added
+    // by the backend later.
+    const completedAnswer = {
+      question:
+        currentQuestion,
+
+      transcript: "",
+
+      feedback: null,
+
+      timing:
+        questionTiming,
+
+      audioIndex:
+        answerAudioBlobsRef
+          .current.length,
+    };
+
+
+    answerAudioBlobsRef.current.push({
+      questionId:
+        currentQuestion.id,
+
+      questionNumber:
+        currentIndex + 1,
+
+      question:
+        currentQuestion.question,
+
+      blob:
+        answerAudioBlob,
+    });
+
+
+    const updatedAnswers = [
+      ...answers,
+      completedAnswer,
+    ];
+
+    setAnswers(
+      updatedAnswers
+    );
+
+    if (
+      currentIndex + 1 >=
+      questions.length
+    ) {
+      await finishInterview(
+        updatedAnswers,
+        finalQuestionTimings
+      );
+
       return;
     }
 
-    setLoading(true);
-    setError("");
-    try {
-      const result = await evaluateInterviewAnswer({
-        sessionId,
-        questionId: currentQuestion.id,
-        jobTitle: setup.jobTitle,
-        companyName: setup.companyName,
-        jobDescription: setup.jobDescription,
-        question: currentQuestion.question,
-        candidateAnswer: cleanAnswer,
-      });
-      setFeedback(result);
-      setAnswers((current) => [...current, {
-        question: currentQuestion,
-        answer: cleanAnswer,
-        feedback: result,
-      }]);
-    } catch (requestError) {
-      setError(requestError.message);
-    } finally {
-      setLoading(false);
-    }
+    goToQuestion(
+      currentIndex + 1
+    );
+  } catch (requestError) {
+    setError(
+      requestError.message ||
+      "Unable to continue the interview."
+    );
+  } finally {
+    setLoading(false);
   }
+}
 
   function goToQuestion(index) {
-    clearVoiceActivity();
-    const reviewedAnswer = answers[index];
-    setCurrentIndex(index);
-    setAnswer(reviewedAnswer?.answer || "");
-    setFeedback(reviewedAnswer?.feedback || null);
-    setError("");
-    const nextQuestion = questions[index]?.question;
-    if (nextQuestion) {
-      playCoachAudio(`Question ${index + 1}. ${nextQuestion}`);
-    }
+  stopCoachAudio();
+
+  setCurrentIndex(index);
+  setAnswer("");
+  setFeedback(null);
+  setError("");
+
+  setAnswerRecording(false);
+
+  answerStartedAtRef.current = null;
+  questionStartedAtRef.current = null;
+
+  const nextQuestion =
+    questions[index]?.question;
+
+  if (nextQuestion) {
+    playCoachAudio(
+      `Question ${index + 1}. ${nextQuestion}`
+    );
+  }
+}
+
+
+
+
+async function cancelInterview() {
+  await endInterviewSession();
+
+  stopCoachAudio();
+
+  persistSession(null);
+
+  setQuestions([]);
+  setSessionId(null);
+  setAnswers([]);
+  setQuestionTimings([]);
+
+  setCurrentIndex(0);
+  setAnswer("");
+  setFeedback(null);
+  setError("");
+
+  answerAudioBlobsRef.current = [];
+  answerAudioChunksRef.current = [];
+  answerAudioRecorderRef.current = null;
+  setAnswerRecording(false);
+
+  sessionStartedAtRef.current = null;
+
+  questionStartedAtRef.current = null;
+
+  answerStartedAtRef.current = null;
+
+  setPhase("setup");
+}
+
+  async function resetInterview() {
+  await endInterviewSession();
+  stopCoachAudio();
+
+  persistSession(null);
+
+  setSetup(EMPTY_SETUP);
+  setQuestions([]);
+  setSessionId(null);
+  setAnswers([]);
+  setQuestionTimings([]);
+
+  setCurrentIndex(0);
+  setAnswer("");
+  setFeedback(null);
+  setError("");
+
+  sessionStartedAtRef.current = null;
+  questionStartedAtRef.current = null;
+  answerStartedAtRef.current = null;
+
+  answerAudioBlobsRef.current = [];
+  answerAudioChunksRef.current = [];
+  answerAudioRecorderRef.current = null;
+  setAnswerRecording(false);
+
+  setRecordedSessionBlob(null);
+
+  if (recordedSessionUrl) {
+    URL.revokeObjectURL(
+      recordedSessionUrl
+    );
   }
 
-  function previousQuestion() {
-    if (currentIndex > 0) goToQuestion(currentIndex - 1);
-  }
+  setRecordedSessionUrl("");
 
-  function selectQuestion(event) {
-    goToQuestion(Number(event.currentTarget.dataset.questionIndex));
-  }
-
-  async function nextQuestion() {
-    if (currentIndex + 1 >= questions.length) {
-      setLoading(true);
-      setError("");
-      try {
-        const completion = await completeInterview(sessionId);
-        const finalResult = {
-          ...completion,
-          completed: true,
-          score: Number(completion?.score ?? averageScore),
-          role: setup.jobTitle,
-          company: setup.companyName,
-          message: `${setup.jobTitle} interview completed`,
-          feedback: `Final evaluation based on all ${answers.length} interview questions.`,
-        };
-        cacheCompletedInterview(finalResult);
-        setPhase("complete");
-      } catch (requestError) {
-        setError(requestError.message);
-      } finally {
-        setLoading(false);
-      }
-      return;
-    }
-    goToQuestion(currentIndex + 1);
-  }
-
-  function resetInterview() {
-    clearVoiceActivity();
-    persistSession(null);
-    setSetup(EMPTY_SETUP);
-    setQuestions([]);
-    setSessionId(null);
-    setAnswers([]);
-    setCurrentIndex(0);
-    setAnswer("");
-    setFeedback(null);
-    setError("");
-    setPhase("setup");
-  }
+  setPhase("setup");
+}
 
   function renderSetup() {
     return (
@@ -492,10 +1472,10 @@ function InterviewCoach() {
         <section className="coach-intro-panel">
           <span className="coach-eyebrow"><Sparkles size={15} /> AI interview coach</span>
           <h2>Practice for the role you actually want.</h2>
-          <p>Get tailored questions and clear, practical feedback after every answer.</p>
+          <p>Complete a realistic interview session and receive detailed feedback when you finish.</p>
           <div className="coach-feature-list">
             <div><Target /><span><strong>Role-specific practice</strong>Questions shaped around the job and company.</span></div>
-            <div><MessageSquareText /><span><strong>Instant feedback</strong>See strengths, improvements, and a stronger answer.</span></div>
+            <div><MessageSquareText /><span><strong>End-of-session feedback</strong>Review every answer together with your final interview score.</span></div>
             <div><Trophy /><span><strong>Track your score</strong>Finish with a clear session summary.</span></div>
           </div>
         </section>
@@ -511,7 +1491,25 @@ function InterviewCoach() {
             <label className="coach-wide">Number of questions<select name="numberOfQuestions" value={setup.numberOfQuestions} onChange={updateSetup}><option value="5">5 questions · Quick practice</option><option value="10">10 questions · Full interview</option></select></label>
           </div>
           {error && <p className="coach-error" role="alert"><CircleAlert size={16} />{error}</p>}
-          <button className="coach-primary-button" disabled={loading}>{loading ? <><LoaderCircle className="coach-spinner" />Preparing your interview...</> : <>Generate my interview<ArrowRight size={17} /></>}</button>
+          <button
+            className="coach-primary-button"
+            disabled={loading}
+          >
+            {loading ? (
+              <>
+                <LoaderCircle
+                  className="coach-spinner"
+                />
+
+                Preparing your interview...
+              </>
+            ) : (
+              <>
+                Generate my interview
+                <ArrowRight size={17} />
+              </>
+            )}
+          </button>          
           <p className="coach-privacy">Your active interview is saved only in this browser tab.</p>
         </form>
       </div>
@@ -533,17 +1531,143 @@ function InterviewCoach() {
   }
 
   function renderInterview() {
-    const progress = ((currentIndex + (feedback ? 1 : 0)) / questions.length) * 100;
+    const progress = ((currentIndex + 1) / questions.length) * 100;
     return (
       <div className="coach-session">
         <div className="coach-session-topbar">
-          <button className="coach-text-button" onClick={resetInterview}><ArrowLeft />End session</button>
+          {sessionRecording && (
+  <div className="coach-session-recording">
+
+    <span className="coach-recording-dot" />
+
+    <span>
+      Interview recording
+    </span>
+
+    <strong>
+      {formatVideoTime(
+        sessionRecordingSeconds
+      )}
+    </strong>
+
+  </div>
+)}
+          <button className="coach-text-button" onClick={cancelInterview}><ArrowLeft />End session</button>
           <div className="coach-session-role"><strong>{setup.jobTitle}</strong><span>{setup.companyName}</span></div>
           <span className="coach-progress-label">{currentIndex + 1} of {questions.length}</span>
         </div>
         <div className="coach-progress-track"><span style={{ width: `${progress}%` }} /></div>
         <div className="coach-interview-workspace">
           <section className="coach-question-card">
+          <div className="coach-interview-room">
+
+  {/* AI INTERVIEWER */}
+  <div className="coach-person-panel">
+
+    <div
+      className={`coach-avatar-frame ${
+        interviewerSpeaking
+          ? "coach-avatar-speaking"
+          : ""
+      }`}
+    >
+      <img
+        src={interviewerAvatar}
+        alt="DWUMA virtual interviewer"
+        className="coach-interviewer-avatar"
+      />
+
+      {interviewerSpeaking && (
+        <div className="coach-avatar-audio-bars">
+          <span />
+          <span />
+          <span />
+          <span />
+        </div>
+      )}
+    </div>
+
+    <div className="coach-person-details">
+
+      <strong>
+        DWUMA Interviewer
+      </strong>
+
+      <span
+        className={
+          interviewerSpeaking
+            ? "coach-person-status active"
+            : ""
+        }
+      >
+        {interviewerSpeaking
+          ? "Speaking..."
+          : interviewerPaused
+            ? "Paused"
+            : "Listening"}
+      </span>
+
+    </div>
+
+  </div>
+
+
+  {/* CANDIDATE */}
+  <div className="coach-person-panel">
+
+    <div className="coach-candidate-frame">
+
+      {cameraEnabled ? (
+        <video
+          ref={videoRef}
+          autoPlay
+          muted
+          playsInline
+          className="coach-camera-video"
+        />
+      ) : (
+        <div className="coach-camera-placeholder">
+
+          <LoaderCircle
+            className="coach-spinner"
+            size={30}
+          />
+
+          <span>
+            Starting camera...
+          </span>
+
+        </div>
+      )}
+
+      {sessionRecording && (
+        <div className="coach-live-badge">
+          <span />
+          REC
+        </div>
+      )}
+
+    </div>
+
+    <div className="coach-person-details">
+
+      <strong>
+        You
+      </strong>
+
+      <span>
+        {interviewerSpeaking
+          ? "Interviewer speaking"
+          : microphoneEnabled
+            ? "Microphone on"
+            : "Microphone unavailable"}
+      </span>
+
+    </div>
+
+  </div>
+
+</div>
             <div className="coach-question-meta"><span className={`coach-category coach-category-${currentQuestion.category}`}>{currentQuestion.category || "general"}</span><span>{currentQuestion.difficulty || "practice"}</span></div>
             <p className="coach-question-number">Question {currentIndex + 1}</p>
             <h2>{currentQuestion.question}</h2>
@@ -560,44 +1684,485 @@ function InterviewCoach() {
               {(speechState === "playing" || speechState === "paused") && <button type="button" className="coach-voice-button coach-voice-stop" onClick={stopCoachAudio}><VolumeX />Stop</button>}
             </div>
             {currentQuestion.whatInterviewerLooksFor && <details><summary><Lightbulb size={15} />What the interviewer is looking for</summary><p>{currentQuestion.whatInterviewerLooksFor}</p></details>}
-            <form onSubmit={submitAnswer} className="coach-answer-form">
-              <label htmlFor="interview-answer">{feedback ? "Your submitted answer" : "Your answer"}</label>
-              {!feedback && <div className="coach-recording-controls">
-                {recordingState === "recording" ? (
-                  <button type="button" className="coach-record-button coach-recording-active" onClick={stopRecording}><Square />Stop recording <span>{formatRecordingTime(recordingSeconds)}</span></button>
+            <div className="coach-spoken-answer">
+
+              <div className="coach-spoken-answer-status">
+
+                <span
+                  className={
+                    microphoneEnabled
+                      ? "coach-mic-status active"
+                      : "coach-mic-status"
+                  }
+                />
+
+                <div>
+                  <strong>
+                    {answerRecording
+                      ? "Your answer is being recorded"
+                      : interviewerSpeaking
+                        ? "Waiting for interviewer..."
+                        : microphoneEnabled
+                          ? "Preparing microphone..."
+                          : "Microphone unavailable"}
+                  </strong>
+
+                  <p>
+                    Answer the question aloud, then continue when you are finished.
+                  </p>
+                </div>
+
+              </div>
+
+              {error && (
+                <p
+                  className="coach-error"
+                  role="alert"
+                >
+                  <CircleAlert size={16} />
+                  {error}
+                </p>
+              )}
+
+              <button
+                type="button"
+                className="coach-primary-button"
+                disabled={
+                  loading ||
+                  interviewerSpeaking ||
+                  !microphoneEnabled 
+                }
+                onClick={submitSpokenAnswer}
+              >
+                {loading ? (
+                  <>
+                    <LoaderCircle
+                      className="coach-spinner"
+                      size={17}
+                    />
+                    Processing...
+                  </>
+                ) : currentIndex + 1 ===
+                    questions.length ? (
+                  <>
+                    Finish Interview
+                    <Trophy size={17} />
+                  </>
                 ) : (
-                  <button type="button" className="coach-record-button" onClick={startRecording} disabled={recordingState === "transcribing"}>
-                    {recordingState === "transcribing" ? <LoaderCircle className="coach-spinner" /> : <Mic />}{recordingState === "transcribing" ? "Transcribing and evaluating..." : recordingState === "ready" ? "Answer evaluated" : "Record answer"}
-                  </button>
+                  <>
+                    Finish Answer
+                    <ArrowRight size={17} />
+                  </>
                 )}
-                <span>{recordingState === "ready" ? "Your transcription and feedback are ready." : "Voice input is optional."}</span>
-              </div>}
-              <textarea id="interview-answer" value={answer} onChange={(event) => { setAnswer(event.target.value); setError(""); }} maxLength={MAX_ANSWER_LENGTH} rows="8" placeholder="Structure your thinking, give a specific example, and explain the outcome..." autoFocus={!feedback} readOnly={Boolean(feedback)} />
-              {!feedback && <div className="coach-answer-footer"><span>{answer.length.toLocaleString()} / {MAX_ANSWER_LENGTH.toLocaleString()}</span><button className="coach-primary-button" disabled={loading || answer.trim().length < 10}>{loading ? <><LoaderCircle className="coach-spinner" />Reviewing...</> : <>Get feedback<ArrowRight size={17} /></>}</button></div>}
-              {error && <p className="coach-error" role="alert"><CircleAlert size={16} />{error}</p>}
-            </form>
+              </button>
+
+            </div>
           </section>
-          {feedback ? renderFeedback() : <aside className="coach-remarks-empty"><div><Sparkles /></div><span className="coach-eyebrow">AI remarks</span><h2>Your feedback will appear here</h2><p>Submit your answer to receive a score, focused coaching points, a stronger example, and a delivery tip.</p></aside>}
         </div>
         <nav className="coach-question-navigation" aria-label="Interview question navigation">
-          <button className="coach-secondary-button" onClick={previousQuestion} disabled={currentIndex === 0}><ArrowLeft size={16} />Previous question</button>
-          <div className="coach-question-dots">{questions.map((question, index) => <button key={question.number || index} data-question-index={index} className={index === currentIndex ? "coach-dot-active" : index < answers.length ? "coach-dot-complete" : ""} onClick={selectQuestion} disabled={index > answers.length} aria-label={`Go to question ${index + 1}`} aria-current={index === currentIndex ? "step" : undefined}>{index + 1}</button>)}</div>
-          <button className="coach-primary-button" onClick={nextQuestion} disabled={!feedback || loading}>{currentIndex + 1 === questions.length ? <>{loading ? "Finalising..." : "View results"}<Trophy size={17} /></> : <>Next question<ChevronRight size={18} /></>}</button>
+        <div className="coach-question-dots">
+
+          {questions.map(
+            (question, index) => (
+              <span
+                key={
+                  question.number ||
+                  index
+                }
+                className={
+                  index === currentIndex
+                    ? "coach-dot-active"
+                    : index < currentIndex
+                      ? "coach-dot-complete"
+                      : ""
+                }
+              >
+                {index + 1}
+              </span>
+            )
+          )}
+
+        </div>          
         </nav>
       </div>
     );
+    
   }
 
-  function renderComplete() {
-    return <section className="coach-complete">
-      <div className="coach-trophy"><Trophy /></div><span className="coach-eyebrow">Session complete</span><h2>You finished your {setup.jobTitle} practice interview.</h2><p>Use the feedback as a rehearsal guide, then come back and try the questions again in your own words.</p>
-      <ScoreRing score={averageScore} label="Average score" />
-      <div className="coach-results-list">{answers.map((item, index) => <div key={`${item.question.number}-${index}`}><span>{index + 1}</span><p>{item.question.question}</p><strong>{item.feedback.score}/100</strong></div>)}</div>
-      <button className="coach-primary-button" onClick={resetInterview}><RotateCcw size={17} />Start a new interview</button>
-    </section>;
-  }
+  function renderProcessing() {
+  const stageText = {
+    recording:
+      "Finishing your interview recording...",
 
-  return <DashboardLayout><div className="coach-page"><header className="coach-page-header"><div><span className="coach-eyebrow"><Sparkles size={14} />Personalised practice</span><h1>Interview Coach</h1><p>Build confidence with questions tailored to your next opportunity.</p></div>{phase !== "setup" && <div className="coach-header-stat"><strong>{completedCount}</strong><span>answers reviewed</span></div>}</header>{phase === "setup" ? renderSetup() : phase === "complete" ? renderComplete() : renderInterview()}</div></DashboardLayout>;
+    uploading:
+      "Uploading your interview recording...",
+
+    transcribing:
+      `Transcribing answer ${processingCurrent} of ${processingTotal}...`,
+
+    evaluating:
+      `Evaluating answer ${processingCurrent} of ${processingTotal}...`,
+
+    finalizing:
+      "Preparing your final interview report...",
+
+    complete:
+      "Your results are ready.",
+  };
+
+  const progress =
+    processingTotal > 0
+      ? Math.round(
+          (
+            processingCurrent /
+            processingTotal
+          ) * 100
+        )
+      : 0;
+
+  return (
+    <section className="coach-processing">
+      <LoaderCircle
+        className="coach-spinner coach-processing-spinner"
+        size={42}
+      />
+
+      <span className="coach-eyebrow">
+        Interview complete
+      </span>
+
+      <h2>
+        Preparing your interview results...
+      </h2>
+
+      <p>
+        {stageText[processingStage] ||
+          "Processing your interview..."}
+      </p>
+
+      {(processingStage === "transcribing" ||
+        processingStage === "evaluating") && (
+        <div className="coach-processing-progress">
+          <div className="coach-processing-progress-track">
+            <span
+              style={{
+                width: `${progress}%`,
+              }}
+            />
+          </div>
+
+          <strong>
+            {progress}%
+          </strong>
+        </div>
+      )}
+
+      <div className="coach-processing-steps">
+        <div
+          className={
+            processingStage !== "recording"
+              ? "active"
+              : ""
+          }
+        >
+          <CheckCircle2 size={18} />
+          <span>
+            Interview recorded
+          </span>
+        </div>
+
+        <div
+          className={
+            [
+              "transcribing",
+              "evaluating",
+              "finalizing",
+              "complete",
+            ].includes(processingStage)
+              ? "active"
+              : ""
+          }
+        >
+          {processingStage ===
+          "transcribing" ? (
+            <LoaderCircle
+              className="coach-spinner"
+              size={18}
+            />
+          ) : (
+            <CheckCircle2 size={18} />
+          )}
+
+          <span>
+            Answers transcribed
+          </span>
+        </div>
+
+        <div
+          className={
+            [
+              "evaluating",
+              "finalizing",
+              "complete",
+            ].includes(processingStage)
+              ? "active"
+              : ""
+          }
+        >
+          {processingStage ===
+          "evaluating" ? (
+            <LoaderCircle
+              className="coach-spinner"
+              size={18}
+            />
+          ) : (
+            <CheckCircle2 size={18} />
+          )}
+
+          <span>
+            Answers evaluated
+          </span>
+        </div>
+
+        <div
+          className={
+            [
+              "finalizing",
+              "complete",
+            ].includes(processingStage)
+              ? "active"
+              : ""
+          }
+        >
+          {processingStage ===
+          "finalizing" ? (
+            <LoaderCircle
+              className="coach-spinner"
+              size={18}
+            />
+          ) : (
+            <CheckCircle2 size={18} />
+          )}
+
+          <span>
+            Final report
+          </span>
+        </div>
+      </div>
+
+      <p className="coach-processing-note">
+        Keep this page open while processing finishes.
+      </p>
+    </section>
+  );
 }
 
+  function renderComplete() {
+  return (
+    <section className="coach-complete">
+
+      <div className="coach-trophy">
+        <Trophy />
+      </div>
+
+      <span className="coach-eyebrow">
+        Session complete
+      </span>
+
+      <h2>
+        You finished your {setup.jobTitle} practice interview.
+      </h2>
+
+      <p>
+        Review your interview recording and results below.
+      </p>
+
+      <ScoreRing
+        score={averageScore}
+        label="Average score"
+      />
+
+      {recordedSessionUrl && (
+        <div className="coach-recorded-video">
+
+          <h3>
+            Recorded interview test
+          </h3>
+
+          <video
+            src={recordedSessionUrl}
+            controls
+            playsInline
+            className="coach-recorded-video-player"
+          />
+
+          <p>
+            Play this recording and check that
+            both your video and voice were captured.
+          </p>
+
+        </div>
+      )}
+
+      <div className="coach-results-list">
+  {answers.map((item, index) => (
+    <details
+      key={`${item.question.number}-${index}`}
+      className="coach-result-card"
+    >
+      <summary className="coach-result-summary">
+        <span className="coach-result-number">
+          {index + 1}
+        </span>
+
+        <div className="coach-result-heading">
+          <p className="coach-result-question">
+            {item.question.question}
+          </p>
+
+          <span className="coach-result-hint">
+            View answer and feedback
+          </span>
+        </div>
+
+        <strong className="coach-result-score">
+          {item.feedback?.score != null
+            ? `${item.feedback.score}/100`
+            : "Not evaluated"}
+        </strong>
+      </summary>
+
+      <div className="coach-result-details">
+        <section className="coach-result-section">
+          <h4>Your answer</h4>
+
+          {item.transcript ? (
+            <p>{item.transcript}</p>
+          ) : (
+            <p className="coach-no-transcript">
+              No transcript was captured for this answer.
+            </p>
+          )}
+        </section>
+
+        {item.feedback && (
+          <>
+            {item.feedback.overallAssessment && (
+              <section className="coach-result-section">
+                <h4>Assessment</h4>
+
+                <p>
+                  {item.feedback.overallAssessment}
+                </p>
+              </section>
+            )}
+
+            <div className="coach-feedback-grid">
+              <section className="coach-result-section">
+                <h4>
+                  <CheckCircle2 size={17} />
+                  What worked
+                </h4>
+
+                {item.feedback.strengths?.length ? (
+                  <ul>
+                    {item.feedback.strengths.map(
+                      (strength, strengthIndex) => (
+                        <li
+                          key={`${index}-strength-${strengthIndex}`}
+                        >
+                          {strength}
+                        </li>
+                      )
+                    )}
+                  </ul>
+                ) : (
+                  <p>
+                    No specific strengths were identified.
+                  </p>
+                )}
+              </section>
+
+              <section className="coach-result-section">
+                <h4>
+                  <Target size={17} />
+                  What to improve
+                </h4>
+
+                {item.feedback.improvements?.length ? (
+                  <ul>
+                    {item.feedback.improvements.map(
+                      (
+                        improvement,
+                        improvementIndex
+                      ) => (
+                        <li
+                          key={`${index}-improvement-${improvementIndex}`}
+                        >
+                          {improvement}
+                        </li>
+                      )
+                    )}
+                  </ul>
+                ) : (
+                  <p>
+                    No specific improvements were identified.
+                  </p>
+                )}
+              </section>
+            </div>
+
+            {item.feedback.improvedAnswer && (
+              <section className="coach-result-section coach-model-answer">
+                <h4>
+                  <Sparkles size={17} />
+                  Stronger answer example
+                </h4>
+
+                <p>
+                  {item.feedback.improvedAnswer}
+                </p>
+              </section>
+            )}
+
+            {item.feedback.deliveryTip && (
+              <section className="coach-result-section coach-delivery-tip">
+                <Lightbulb size={18} />
+
+                <div>
+                  <h4>Delivery tip</h4>
+
+                  <p>
+                    {item.feedback.deliveryTip}
+                  </p>
+                </div>
+              </section>
+            )}
+          </>
+        )}
+      </div>
+    </details>
+  ))}
+</div>
+
+      <button
+        className="coach-primary-button"
+        onClick={resetInterview}
+      >
+        <RotateCcw size={17} />
+        Start a new interview
+      </button>
+
+    </section>
+  );
+}
+
+  return <DashboardLayout pageTitle="Interview Coach"><div className="coach-page"><header className="coach-page-header"><div><span className="coach-eyebrow"><Sparkles size={14} />Personalised practice</span><h1>Let Us Help You</h1><p>Build confidence with questions tailored to your next opportunity.</p></div>{phase === "interview" && (
+  <div className="coach-header-stat">
+    <strong>{completedCount}</strong>
+    <span>answers completed</span>
+  </div>
+)}</header>{phase === "setup"? renderSetup() : phase === "processing" ? renderProcessing(): phase === "complete" ? renderComplete() : renderInterview()}</div></DashboardLayout>;
+
+}
 export default InterviewCoach;

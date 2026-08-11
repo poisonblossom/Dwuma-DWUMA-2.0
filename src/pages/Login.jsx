@@ -72,7 +72,7 @@ function Login() {
             "Content-Type": "application/json",
           },
           body: JSON.stringify({
-            email: username,
+            login: username,
             password,
           }),
         },
@@ -95,6 +95,19 @@ function Login() {
           });
 
           return;
+        }
+
+       if (data?.errors) {
+          const messages =
+            Object.values(data.errors)
+              .flat()
+              .filter(Boolean);
+
+          if (messages.length) {
+            throw new Error(
+              messages.join(" "),
+            );
+          }
         }
 
         throw new Error(

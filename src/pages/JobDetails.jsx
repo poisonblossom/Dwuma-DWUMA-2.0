@@ -29,6 +29,42 @@ function formatDate(value) {
     : date.toLocaleDateString(undefined, { year: "numeric", month: "short", day: "numeric" });
 }
 
+function getJobDescription(description) {
+  const text = String(description || "").trim();
+  if (!text) return "No description was provided for this role.";
+
+  const descriptionMarkers = [
+    "Position Overview",
+    "Job Description",
+    "Role Overview",
+    "About the Role",
+  ];
+  const markerPositions = descriptionMarkers
+    .map((marker) => ({ marker, index: text.toLowerCase().indexOf(marker.toLowerCase()) }))
+    .filter(({ index }) => index >= 0)
+    .sort((a, b) => a.index - b.index);
+
+  const roleDescription = markerPositions.length
+    ? text
+        .slice(markerPositions[0].index + markerPositions[0].marker.length)
+        .replace(/^\s*[:\-–—]\s*/, "")
+        .trim()
+    : text;
+  const unwantedMarkers = [
+    "Latest Career Advice",
+    "SHARE with someone special",
+  ];
+  const unwantedPositions = unwantedMarkers
+    .map((marker) => roleDescription.toLowerCase().indexOf(marker.toLowerCase()))
+    .filter((index) => index >= 0);
+
+  const cleanedDescription = unwantedPositions.length
+    ? roleDescription.slice(0, Math.min(...unwantedPositions)).trim()
+    : roleDescription;
+
+  return cleanedDescription || "No description was provided for this role.";
+}
+
 function JobDetails() {
   const [, navigate] = useLocation();
   const job = useMemo(() => readSelectedJob(), []);
@@ -63,11 +99,6 @@ function JobDetails() {
             <h1>{job.title || "Untitled role"}</h1>
             <p>{job.company || "Company not specified"}</p>
           </div>
-          {applicationUrl && (
-            <a className="job-detail-apply" href={applicationUrl} target="_blank" rel="noreferrer">
-              Apply now<ExternalLink size={16} />
-            </a>
-          )}
         </header>
 
         <section className="job-detail-meta" aria-label="Job summary">
@@ -80,7 +111,7 @@ function JobDetails() {
 
         <section className="job-detail-content">
           <h2>About this role</h2>
-          <div className="job-detail-description">{job.description || "No description was provided for this role."}</div>
+          <div className="job-detail-description">{getJobDescription(job.description)}</div>
         </section>
 
         {applicationUrl && (

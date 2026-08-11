@@ -255,7 +255,7 @@ function Settings() {
   }
 
   return (
-    <DashboardLayout>
+    <DashboardLayout pageTitle="Settings">
       <main className="dashboard-page">
         {isLoading ? (
           <DashboardPageLoader message="Preparing your settings..." />

@@ -12,6 +12,19 @@ import {
   hasActiveInterview,
 } from "../Components/services/interviewService";
 import { getUserSkillsGap } from "../Components/services/skillsGapService";
+import { getJobs } from "../Components/services/jobsService";
+
+function readJobPreferences() {
+  try {
+    const onboarding = JSON.parse(localStorage.getItem("dwumaOnboardingData") || "{}");
+    return {
+      role: onboarding.desiredRole || onboarding.careerGoal || onboarding.fieldOfWork || onboarding.fieldOfStudy || "jobs",
+      location: onboarding.location || onboarding.workLocation || "Ghana",
+    };
+  } catch {
+    return { role: "jobs", location: "Ghana" };
+  }
+}
 
 function Dashboard() {
   /*
@@ -25,6 +38,9 @@ function Dashboard() {
   const [skillsGap, setSkillsGap] = useState(null);
   const [skillsGapLoading, setSkillsGapLoading] = useState(true);
   const [skillsGapError, setSkillsGapError] = useState("");
+  const [recommendedJobs, setRecommendedJobs] = useState([]);
+  const [jobsLoading, setJobsLoading] = useState(true);
+  const [jobsError, setJobsError] = useState("");
 
   useEffect(() => {
     if (hasActiveInterview()) {
@@ -41,6 +57,32 @@ function Dashboard() {
         // Keep the last confirmed completion visible during a temporary API failure.
       });
     return () => { active = false; };
+  }, []);
+
+  useEffect(() => {
+    const controller = new AbortController();
+    const preferences = readJobPreferences();
+
+    getJobs({
+      query: preferences.role,
+      location: preferences.location,
+      signal: controller.signal,
+    })
+      .then((result) => {
+        setRecommendedJobs(result.jobs.slice(0, 4));
+        setJobsError("");
+      })
+      .catch((error) => {
+        if (error.name !== "AbortError") {
+          setRecommendedJobs([]);
+          setJobsError(error.message);
+        }
+      })
+      .finally(() => {
+        if (!controller.signal.aborted) setJobsLoading(false);
+      });
+
+    return () => controller.abort();
   }, []);
 
   useEffect(() => {
@@ -63,7 +105,6 @@ function Dashboard() {
 
   const user = dashboardData?.user ?? null;
   const interview = latestInterview;
-  const jobs = dashboardData?.recommendedJobs ?? [];
   const unreadNotifications =
     dashboardData?.unreadNotifications;
 
@@ -71,6 +112,7 @@ function Dashboard() {
     <DashboardLayout
       user={user}
       unreadNotifications={unreadNotifications}
+      pageTitle="Dashboard"
     >
       <section className="dashboard-overview-grid">
         <SkillGapCard
@@ -82,7 +124,7 @@ function Dashboard() {
         <InterviewScoreCard interview={interview} />
       </section>
 
-      <RecommendedJobs jobs={jobs} />
+      <RecommendedJobs jobs={recommendedJobs} loading={jobsLoading} error={jobsError} />
     </DashboardLayout>
   );
 }

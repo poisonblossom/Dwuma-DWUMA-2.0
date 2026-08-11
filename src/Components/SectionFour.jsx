@@ -1,6 +1,9 @@
 import lady2 from "../assets/lady2.png";
+import { useLocation } from "wouter";
 
 function SectionFour() {
+  const [, navigate] = useLocation();
+
   return (
     <section className="section-four">
       <div className="section-four-container">
@@ -26,7 +29,11 @@ function SectionFour() {
             to your skills and goals.
           </p>
 
-          <button className="resume-btn">
+          <button
+            type="button"
+            className="resume-btn"
+            onClick={() => navigate("/create-account")}
+          >
             Resume tailor
           </button>
 

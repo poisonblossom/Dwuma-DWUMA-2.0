@@ -282,7 +282,7 @@ function Notifications() {
   }
 
   return (
-    <DashboardLayout>
+    <DashboardLayout pageTitle="Notifications">
       <main className="dashboard-page">
         {isLoading ? (
           <DashboardPageLoader message="Checking your notifications..." />
@@ -290,9 +290,7 @@ function Notifications() {
           <>
             <div className="page-heading page-heading-with-actions">
               <div>
-                <p className="page-eyebrow">Updates</p>
-
-                <h1>Notifications</h1>
+                <h1>Get Updates...</h1>
 
                 <p>
                   {unreadCount > 0

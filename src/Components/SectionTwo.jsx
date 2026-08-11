@@ -1,6 +1,9 @@
 import findJob from "../assets/findjob.svg";
+import { useLocation } from "wouter";
 
 function SectionTwo() {
+  const [, navigate] = useLocation();
+
   return (
     <section className="section-two">
       <div className="section-two-content">
@@ -17,12 +20,12 @@ function SectionTwo() {
           </p>
 
           <div className="section-buttons">
-            <button className="primary-btn">
+            <button
+              type="button"
+              className="primary-btn"
+              onClick={() => navigate("/create-account")}
+            >
               Sign up
-            </button>
-
-            <button className="secondary-btn">
-              Learn More
             </button>
           </div>
         </div>
@@ -36,8 +39,8 @@ function SectionTwo() {
       <div className="stats-row">
         {[...Array(10)].map((_, index) => (
           <div key={index} className="stat-item">
-            <span>100+</span>
-            <p>students</p>
+            <span>Built</span>
+            <p>{index % 2 === 0 ? "for students" : "by students"}</p>
           </div>
         ))}
       </div>

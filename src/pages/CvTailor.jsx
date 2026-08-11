@@ -327,7 +327,7 @@ function CvTailor() {
 
         <div className="cv-tailor-content">
           <div className="cv-tailor-heading">
-            <h1>CV Tailor</h1>
+            <h1>Better That CV</h1>
 
             <p>
               Upload your CV and tailor it for the role

@@ -3,6 +3,7 @@ import {
   Menu,
   Search,
 } from "lucide-react";
+import { useState } from "react";
 import { useLocation } from "wouter";
 
 function getUserName(user) {
@@ -25,10 +26,17 @@ function DashboardHeader({
   user,
   unreadNotifications = 0,
   onOpenSidebar,
-  pageTitle = "Dashboard",
+  pageTitle = "Profile",
 }) {
   const [, navigate] = useLocation();
   const firstName = getUserName(user).split(/\s+/)[0];
+  const [jobQuery, setJobQuery] = useState("");
+
+  function handleJobSearch(event) {
+    event.preventDefault();
+    const query = jobQuery.trim();
+    navigate(query ? `/dashboard/jobs?q=${encodeURIComponent(query)}` : "/dashboard/jobs");
+  }
 
   return (
     <header className="dashboard-header">
@@ -65,16 +73,16 @@ function DashboardHeader({
       <div className="dashboard-header-actions">
         <form
           className="dashboard-search"
-          onSubmit={(event) =>
-            event.preventDefault()
-          }
+          onSubmit={handleJobSearch}
         >
           <Search size={17} />
 
           <input
             type="search"
-            placeholder="Search jobs, skills..."
-            aria-label="Search jobs and skills"
+            value={jobQuery}
+            onChange={(event) => setJobQuery(event.target.value)}
+            placeholder="Search jobs"
+            aria-label="Search jobs"
           />
         </form>
 

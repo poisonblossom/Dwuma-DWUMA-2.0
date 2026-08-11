@@ -17,7 +17,7 @@ function DashboardLayout({
   children,
   user,
   unreadNotifications,
-  pageTitle = "Dashboard",
+  pageTitle = "Profile",
 }) {
   const [isSidebarOpen, setIsSidebarOpen] =
     useState(false);

@@ -29,19 +29,41 @@ function readOnboarding() {
   }
 }
 
+function cleanLocationPart(value) {
+  return String(value || "")
+    .replace(/^(onsite|remote|hybrid)\s*[:;,\-]?\s*/i, "")
+    .trim();
+}
+
+function getSavedLocationPart(onboarding, part) {
+  if (onboarding[part]) return cleanLocationPart(onboarding[part]);
+  const [city = "", region = ""] = String(onboarding.location || "")
+    .split(",")
+    .map((value) => value.trim());
+  return cleanLocationPart(part === "city" ? city : region);
+}
+
 function Jobs() {
-  const [, navigate] = useLocation();
+  const [currentLocation, navigate] = useLocation();
   const onboarding = useMemo(() => readOnboarding(), []);
+  const headerQuery = useMemo(() => {
+    const queryString = currentLocation.includes("?")
+      ? currentLocation.slice(currentLocation.indexOf("?") + 1)
+      : window.location.search.slice(1);
+    return new URLSearchParams(queryString).get("q")?.trim() || "";
+  }, [currentLocation]);
   const [jobs, setJobs] = useState([]);
   const [loading, setLoading] = useState(true);
-  const [query, setQuery] = useState(onboarding.desiredRole || "");
-  const [location, setLocation] = useState(onboarding.location || "");
+  const [query, setQuery] = useState(headerQuery || onboarding.desiredRole || "");
+  const [city, setCity] = useState(() => getSavedLocationPart(onboarding, "city"));
+  const [region, setRegion] = useState(() => getSavedLocationPart(onboarding, "region"));
   const [jobType, setJobType] = useState(onboarding.jobType || "");
   const [workArrangement, setWorkArrangement] = useState(onboarding.jobForm || "");
   const [sort, setSort] = useState("newest");
   const [nextPageToken, setNextPageToken] = useState(null);
   const [hasMore, setHasMore] = useState(false);
   const [error, setError] = useState("");
+  const location = [cleanLocationPart(city), cleanLocationPart(region)].filter(Boolean).join(", ");
 
   async function searchJobs({ append = false, token, signal } = {}) {
     setLoading(true);
@@ -70,14 +92,16 @@ function Jobs() {
 
   useEffect(() => {
     const controller = new AbortController();
+    const requestedQuery = headerQuery || query;
     getJobs({
-      query,
+      query: requestedQuery,
       location,
       jobType,
       remote: workArrangement === "Remote" ? true : workArrangement === "Onsite" ? false : undefined,
       signal: controller.signal,
     })
       .then((result) => {
+        if (headerQuery) setQuery(headerQuery);
         setJobs(result.jobs);
         setNextPageToken(result.nextPageToken);
         setHasMore(result.hasMore);
@@ -93,9 +117,10 @@ function Jobs() {
       });
 
     return () => controller.abort();
-  // Onboarding values intentionally seed the first backend search only.
+  // The header query triggers a fresh backend search when it changes.
+  // Other filters are submitted through the Jobs page form.
   // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [headerQuery]);
 
   const visibleJobs = useMemo(() => {
     const filtered = [...jobs];
@@ -111,7 +136,8 @@ function Jobs() {
 
   function resetFilters() {
     setQuery("");
-    setLocation("");
+    setCity("");
+    setRegion("");
     setJobType("");
     setWorkArrangement("");
   }
@@ -130,7 +156,7 @@ function Jobs() {
     <DashboardLayout pageTitle="Jobs">
       <section className="jobs-page">
         <header className="jobs-page-heading">
-          <h1>Jobs</h1>
+          <h1>Find Jobs</h1>
           <p>Discover opportunities that match your skills and career goals.</p>
         </header>
 
@@ -141,12 +167,14 @@ function Jobs() {
               type="search"
               value={query}
               onChange={(event) => setQuery(event.target.value)}
-              placeholder="Search jobs, companies, or keywords..."
+              placeholder="Job role"
             />
             <Search size={22} aria-hidden="true" />
           </label>
 
-          <input value={location} onChange={(event) => setLocation(event.target.value)} aria-label="Filter by location" placeholder="Location, e.g. Accra, Ghana" />
+          <input value={cleanLocationPart(city)} onChange={(event) => setCity(event.target.value)} aria-label="Filter by city" placeholder="City" />
+
+          <input value={region} onChange={(event) => setRegion(event.target.value)} aria-label="Filter by region" placeholder="Region" />
 
           <select value={jobType} onChange={(event) => setJobType(event.target.value)} aria-label="Filter by job type">
             <option value="">Job Type</option>
@@ -157,7 +185,7 @@ function Jobs() {
           </select>
 
           <select value={workArrangement} onChange={(event) => setWorkArrangement(event.target.value)} aria-label="Filter by work arrangement">
-            <option value="">Remote or onsite</option>
+            <option value="">Job mode</option>
             <option value="Remote">Remote</option>
             <option value="Onsite">Onsite</option>
             <option value="Hybrid">Hybrid</option>

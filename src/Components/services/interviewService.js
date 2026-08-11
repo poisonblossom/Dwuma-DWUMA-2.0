@@ -300,3 +300,61 @@ export async function transcribeInterviewAnswer(
 
   return data;
 }
+export async function createSimliSession() {
+  const token = getToken();
+
+  if (!token) {
+    throw new Error("Your login session has expired. Please sign in again.");
+  }
+
+  const response = await fetch(`${API_BASE_URL}/interview/simli/session-token`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+  });
+
+  const data = await response.json().catch(() => null);
+
+  if (!response.ok) {
+    throw new Error(
+      data?.message ||
+        "The live interviewer could not connect. Standard voice mode will be used."
+    );
+  }
+
+  return {
+    sessionToken: data?.sessionToken || data?.session_token,
+  };
+}
+
+export async function generateInterviewerSpeech(text) {
+  const token = getToken();
+
+  if (!token) {
+    throw new Error("Your login session has expired. Please sign in again.");
+  }
+
+  const response = await fetch(`${API_BASE_URL}/interview/speech`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ text }),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    throw new Error(
+      data?.message ||
+        "The interviewer voice could not be generated. Standard voice mode will be used."
+    );
+  }
+
+  const pcmBytes = new Uint8Array(await response.arrayBuffer());
+  const sampleRate = Number(response.headers.get("X-Audio-Sample-Rate")) || 24000;
+
+  return { pcmBytes, sampleRate };
+}

@@ -50,3 +50,25 @@ export async function tailorCv({ file, jobTitle, jobDescription, companyName }) 
 
   return data;
 }
+
+export async function downloadTailoredCv({ tailoredCv, jobTitle, companyName }) {
+  const token = getToken();
+  if (!token) throw new Error("Your session has expired. Please sign in again.");
+
+  const response = await fetch(`${API_BASE_URL}/ResumeTailor/download`, {
+    method: "POST",
+    headers: {
+      Accept: "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+      Authorization: `Bearer ${token}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ tailoredCv, jobTitle, companyName }),
+  });
+
+  if (!response.ok) {
+    const data = await response.json().catch(() => null);
+    throw new Error(data?.message || data?.title || "The Word document could not be generated.");
+  }
+
+  return response.blob();
+}

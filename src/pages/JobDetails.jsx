@@ -51,6 +51,19 @@ function getJobDescription(description) {
         .trim()
     : text;
   const unwantedMarkers = [
+    "Should be of a Professional rank",
+    "Qualifications",
+    "Qualification",
+    "Eligibility",
+    "The Occupant's Responsibilities",
+    "The Occupant’s Responsibilities",
+    "Responsibilities",
+    "Responsibility",
+    "Conditions of Service",
+    "Location:",
+    "How To Apply",
+    "How to Apply",
+    "Closing Date:",
     "Latest Career Advice",
     "SHARE with someone special",
   ];
@@ -62,7 +75,15 @@ function getJobDescription(description) {
     ? roleDescription.slice(0, Math.min(...unwantedPositions)).trim()
     : roleDescription;
 
-  return cleanedDescription || "No description was provided for this role.";
+  const formattedDescription = cleanedDescription
+    .replace(/<br\s*\/?>/gi, " ")
+    .replace(/<\/p\s*>/gi, " ")
+    .replace(/<[^>]+>/g, " ")
+    .replace(/([.!?])(?=[A-Z])/g, "$1 ")
+    .replace(/\s+/g, " ")
+    .trim();
+
+  return formattedDescription || "No description was provided for this role.";
 }
 
 function JobDetails() {

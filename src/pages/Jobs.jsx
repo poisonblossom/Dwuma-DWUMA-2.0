@@ -4,9 +4,9 @@ import {
   BriefcaseBusiness,
   Building2,
   Funnel,
+  FunnelX,
   MapPin,
   Search,
-  SlidersHorizontal,
   WalletCards,
 } from "lucide-react";
 
@@ -193,7 +193,7 @@ function Jobs() {
 
           <button type="submit" className="jobs-search-button">Search jobs</button>
           <button type="button" className="jobs-filter-button" onClick={resetFilters} aria-label="Clear all job filters" title="Clear filters">
-            <SlidersHorizontal size={21} />
+            <FunnelX size={25} />
           </button>
         </form>
 

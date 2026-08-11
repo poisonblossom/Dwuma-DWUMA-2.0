@@ -21,6 +21,7 @@ import DashboardLayout from "../Components/dashboard/DashboardLayout";
 import "../Components/dashboard/Dashboard.css";
 import ParsedCvResponse from "../Components/cv/ParsedCvResponse";
 import TailoringInsights from "../Components/cv/TailoringInsights";
+import { downloadTailoredCv } from "../Components/services/cvTailorService";
 import "./CvTailorResults.css";
 
 function readSavedValue(key) {
@@ -47,6 +48,7 @@ function CvTailorResults() {
   );
   const isLoadingStorage = false;
   const [statusMessage, setStatusMessage] = useState("");
+  const [downloadingDocx, setDownloadingDocx] = useState(false);
 
   function closeMenu() {
     setMenuOpen(false);
@@ -100,17 +102,36 @@ function CvTailorResults() {
     );
   }
 
-  function handleDownloadText() {
+  async function handleDownloadDocx() {
     const content = tailorResult?.tailoredCv;
-    if (!content) return;
+    if (!content) {
+      setStatusMessage("The tailored CV content is unavailable.");
+      return;
+    }
 
-    const file = new Blob([content], { type: "text/plain;charset=utf-8" });
-    const url = URL.createObjectURL(file);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${tailorRequest?.fileName?.replace(/\.[^.]+$/, "") || "tailored-cv"}-tailored.txt`;
-    link.click();
-    URL.revokeObjectURL(url);
+    setDownloadingDocx(true);
+    setStatusMessage("");
+
+    try {
+      const file = await downloadTailoredCv({
+        tailoredCv: content,
+        jobTitle: tailorRequest?.jobTitle || "Tailored",
+        companyName: tailorRequest?.companyName || "",
+      });
+      const url = URL.createObjectURL(file);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${tailorRequest?.fileName?.replace(/\.[^.]+$/, "") || "tailored-cv"}-tailored.docx`;
+      document.body.appendChild(link);
+      link.click();
+      link.remove();
+      URL.revokeObjectURL(url);
+      setStatusMessage("Your tailored Word document has been downloaded.");
+    } catch (error) {
+      setStatusMessage(error.message);
+    } finally {
+      setDownloadingDocx(false);
+    }
   }
 
   function renderPageContent() {
@@ -353,10 +374,11 @@ function CvTailorResults() {
               {tailorResult.type === "tailored-cv" && <button
                 type="button"
                 className="cv-download-button cv-download-primary"
-                onClick={handleDownloadText}
+                onClick={handleDownloadDocx}
+                disabled={downloadingDocx}
               >
-                <Download size={17} />
-                <span>Download Tailored Text</span>
+                {downloadingDocx ? <LoaderCircle className="cv-results-spinner" size={17} /> : <Download size={17} />}
+                <span>{downloadingDocx ? "Preparing Word file..." : "Download Tailored CV (.docx)"}</span>
               </button>}
 
               {!isParsedCv && tailorResult.type !== "tailored-cv" && <><button

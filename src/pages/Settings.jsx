@@ -1,7 +1,5 @@
 import { useEffect, useState } from "react";
 import {
-  Bell,
-  Eye,
   LockKeyhole,
   Trash2,
   UserRound,
@@ -24,16 +22,6 @@ const settingsSections = [
     id: "security",
     label: "Security",
     icon: LockKeyhole,
-  },
-  {
-    id: "notifications",
-    label: "Notifications",
-    icon: Bell,
-  },
-  {
-    id: "privacy",
-    label: "Privacy",
-    icon: Eye,
   },
 ];
 
@@ -87,6 +75,10 @@ function Settings() {
   const [settings, setSettings] = useState(initialSettings);
   const [isLoading, setIsLoading] = useState(true);
   const [savingSection, setSavingSection] = useState("");
+  const [showPasswordForm, setShowPasswordForm] = useState(false);
+  const [passwordForm, setPasswordForm] = useState({ currentPassword: "", newPassword: "", confirmPassword: "" });
+  const [passwordStatus, setPasswordStatus] = useState({ type: "", message: "" });
+  const [changingPassword, setChangingPassword] = useState(false);
 
   async function fetchSettings() {
     try {
@@ -215,19 +207,62 @@ function Settings() {
     });
   }
 
+  async function changePassword(event) {
+    event.preventDefault();
+    setPasswordStatus({ type: "", message: "" });
+
+    if (passwordForm.newPassword.length < 8) {
+      setPasswordStatus({ type: "error", message: "The new password must contain at least 8 characters." });
+      return;
+    }
+
+    if (passwordForm.newPassword !== passwordForm.confirmPassword) {
+      setPasswordStatus({ type: "error", message: "The new passwords do not match." });
+      return;
+    }
+
+    setChangingPassword(true);
+
+    try {
+      const response = await fetch(`${API_BASE_URL}/auth/password`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${getAuthToken()}`,
+        },
+        body: JSON.stringify({
+          currentPassword: passwordForm.currentPassword,
+          newPassword: passwordForm.newPassword,
+        }),
+      });
+
+      if (!response.ok) {
+        const data = await response.json().catch(() => null);
+        throw new Error(data?.message || data?.title || "The password could not be changed.");
+      }
+
+      setPasswordForm({ currentPassword: "", newPassword: "", confirmPassword: "" });
+      setPasswordStatus({ type: "success", message: "Your password has been updated successfully." });
+    } catch (error) {
+      setPasswordStatus({ type: "error", message: error.message });
+    } finally {
+      setChangingPassword(false);
+    }
+  }
+
   async function deleteAccount() {
-    const confirmed = window.confirm(
-      "Are you sure you want to permanently delete your account?",
+    const confirmation = window.prompt(
+      "This permanently deletes your account and all associated data. This cannot be undone. Type DELETE to continue.",
     );
 
-    if (!confirmed) {
+    if (confirmation !== "DELETE") {
       return;
     }
 
     try {
       const token = getAuthToken();
 
-      const response = await fetch(`${API_BASE_URL}/account`, {
+      const response = await fetch(`${API_BASE_URL}/auth/account`, {
         method: "DELETE",
         headers: {
           ...(token
@@ -242,11 +277,12 @@ function Settings() {
         return;
       }
 
-      localStorage.removeItem("dwumaToken");
-      sessionStorage.removeItem("dwumaToken");
-
-      localStorage.removeItem("dwumaLogin");
-      sessionStorage.removeItem("dwumaLogin");
+      Object.keys(localStorage)
+        .filter((key) => key.startsWith("dwuma"))
+        .forEach((key) => localStorage.removeItem(key));
+      Object.keys(sessionStorage)
+        .filter((key) => key.startsWith("dwuma"))
+        .forEach((key) => sessionStorage.removeItem(key));
 
       window.location.href = "/login";
     } catch {
@@ -351,10 +387,33 @@ function Settings() {
                         <button
                           type="button"
                           className="secondary-button"
+                          onClick={() => {
+                            setShowPasswordForm((current) => !current);
+                            setPasswordStatus({ type: "", message: "" });
+                          }}
                         >
-                          Change
+                          {showPasswordForm ? "Cancel" : "Change"}
                         </button>
                       </div>
+
+                      {showPasswordForm && (
+                        <form className="settings-password-form" onSubmit={changePassword}>
+                          <label>
+                            <span>Current password</span>
+                            <input type="password" autoComplete="current-password" required value={passwordForm.currentPassword} onChange={(event) => setPasswordForm((current) => ({ ...current, currentPassword: event.target.value }))} />
+                          </label>
+                          <label>
+                            <span>New password</span>
+                            <input type="password" autoComplete="new-password" required minLength={8} value={passwordForm.newPassword} onChange={(event) => setPasswordForm((current) => ({ ...current, newPassword: event.target.value }))} />
+                          </label>
+                          <label>
+                            <span>Confirm new password</span>
+                            <input type="password" autoComplete="new-password" required minLength={8} value={passwordForm.confirmPassword} onChange={(event) => setPasswordForm((current) => ({ ...current, confirmPassword: event.target.value }))} />
+                          </label>
+                          {passwordStatus.message && <p className={`settings-password-status ${passwordStatus.type}`} role="status">{passwordStatus.message}</p>}
+                          <button type="submit" className="primary-button" disabled={changingPassword}>{changingPassword ? "Updating..." : "Update password"}</button>
+                        </form>
+                      )}
                     </div>
                   </article>
                 )}

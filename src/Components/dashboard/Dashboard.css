@@ -1,3 +1,5 @@
+@import url("https://fonts.googleapis.com/css2?family=Montserrat:wght@500;600;700&display=swap");
+
 * {
     margin: 0;
     padding: 0;
@@ -1379,3 +1381,124 @@ button {
 .interview-empty-content button {
   align-self: center;
 }
+
+/* Skill gap analysis */
+.skill-card,.skill-card * { font-family:"Montserrat", Arial, sans-serif; }
+.skill-card { min-height:420px; }
+.skill-card .dashboard-card-header { min-height:58px; padding:0 18px; }
+.skill-card .dashboard-card-header h2 { display:flex; align-items:center; gap:10px; color:#8c0a0f; font-size:16px; }
+.skill-header-icon { width:28px; height:28px; display:grid; place-items:center; color:#a70d13; background:#fbecee; border-radius:7px; }
+.skill-header-icon svg { width:17px; }
+.skill-card .skill-card-content { min-height:0; display:grid; grid-template-columns:170px minmax(0,1fr); align-items:start; gap:24px; padding:20px 22px; }
+.skill-score-column { display:flex; flex-direction:column; align-items:center; gap:14px; }
+.skill-card .skill-chart { width:150px; height:150px; }
+.skill-card .skill-chart::before { width:92px; height:92px; }
+.skill-card .skill-chart-centre strong { font-size:27px; }
+.skill-card .skill-chart-centre span { font-size:9px; }
+.skill-gap-counts { width:100%; display:grid; grid-template-columns:1fr 1fr; }
+.skill-gap-counts>div { display:flex; flex-direction:column; align-items:center; padding:0 7px; }
+.skill-gap-counts>div+div { border-left:1px solid #eadede; }
+.skill-gap-counts span { width:20px; height:20px; display:grid; place-items:center; color:#fff; background:#9f0d12; border-radius:50%; }
+.skill-gap-counts>div:last-child span { background:#ef7d82; }
+.skill-gap-counts svg { width:11px; }
+.skill-gap-counts strong { margin-top:5px; color:#8f0a0f; font-size:14px; }
+.skill-gap-counts small { margin-top:2px; color:#5d4b4d; font-size:8px; }
+.skill-card .skill-list { width:100%; }
+.skill-list-head { display:grid; grid-template-columns:1fr 108px; padding:0 0 8px 42px; color:#655456; border-bottom:1px solid #eadfe0; font-size:8px; text-transform:uppercase; }
+.skill-card .skill-list-item { position:relative; display:grid; grid-template-columns:30px minmax(0,1fr) 100px; align-items:center; gap:10px; min-height:56px; margin:0; padding:9px 0; border-bottom:1px solid #eee3e3; }
+.skill-card .skill-list-link { padding-right:18px; color:inherit; text-decoration:none; transition:background .18s ease; }
+.skill-card .skill-list-link:hover { background:#fff8f8; }
+.skill-card .skill-list-link:focus-visible { outline:2px solid #a80e14; outline-offset:2px; border-radius:7px; }
+.skill-resource-link-icon { position:absolute; right:1px; width:11px; color:#a80e14; opacity:.7; }
+.skill-row-icon { width:28px; height:28px; display:grid; place-items:center; color:#fff; background:#a80e14; border-radius:7px; }
+.skill-row-icon-3 { background:#ed777c; }
+.skill-row-icon svg { width:15px; }
+.skill-card .skill-list-item>div { min-width:0; }
+.skill-card .skill-list-item>div strong { color:#33292b; font-size:9px; }
+.skill-card .skill-list-item p { margin:3px 0 0; color:#68585a; font-size:8px; font-weight:400; line-height:1.35; white-space:normal; }
+.skill-status { width:fit-content; display:inline-flex; align-items:center; gap:5px; justify-self:start; padding:7px 10px; border-radius:8px; font-size:8px; font-weight:700; }
+.skill-status svg { width:12px; }
+.skill-status.developing { color:#26862d; background:#e9f5e4; }
+.skill-status.missing { color:#c11d24; background:#fbe8e9; }
+.skill-recommendation { grid-column:1/-1; display:flex; align-items:flex-start; gap:14px; padding:14px 16px; background:linear-gradient(90deg,#fff7f7,#fffafa); border:1px solid #f0dede; border-radius:10px; }
+.skill-recommendation>span { width:38px; height:38px; display:grid; place-items:center; flex:none; color:#a90d13; background:#fff; border-radius:50%; }
+.skill-recommendation svg { width:19px; }
+.skill-recommendation strong { color:#9b0c11; font-size:10px; }
+.skill-recommendation p { margin:4px 0 0; color:#5e4d50; font-size:8px; line-height:1.45; }
+
+@media (max-width: 1150px) and (min-width: 851px) {
+  .skill-card .skill-card-content { grid-template-columns:1fr; }
+  .skill-recommendation { grid-column:1; }
+}
+
+@media (max-width: 560px) {
+  .skill-card .skill-card-content { grid-template-columns:1fr; padding:18px; }
+  .skill-recommendation { grid-column:1; }
+  .skill-list-head { display:none; }
+  .skill-card .skill-list-item { grid-template-columns:30px minmax(0,1fr); }
+  .skill-status { grid-column:2; }
+}
+
+/* Interview score dashboard card */
+.interview-card,.interview-card * { font-family:"Montserrat", Arial, sans-serif; }
+.interview-card { min-height:420px; background:radial-gradient(circle at 82% 24%,rgba(255,255,255,.08),transparent 25%),linear-gradient(145deg,#bd1118 0%,#a0070d 52%,#790408 100%); }
+.interview-dashboard-heading { padding:22px 22px 8px; }
+.interview-dashboard-heading h2 { margin:0; color:#fff; font-size:16px; }
+.interview-dashboard-heading p { margin:5px 0 0; color:rgba(255,255,255,.82); font-size:8px; }
+.interview-card .interview-dashboard-body { min-height:0; display:flex; flex-direction:column; align-items:stretch; gap:16px; padding:14px 20px 22px; overflow:visible; }
+.interview-dashboard-main { position:relative; min-height:145px; display:grid; grid-template-columns:115px minmax(0,1fr) 115px; align-items:center; gap:16px; }
+.interview-card .interview-score-ring { width:112px; height:112px; }
+.interview-card .interview-score-ring::before { width:82px; height:82px; background:#a70a10; }
+.interview-card .interview-score-ring strong { font-size:24px; }
+.interview-card .interview-card-message { max-width:none; }
+.interview-card .interview-card-message h3 { margin:0; color:#fff; font-size:13px; line-height:1.4; }
+.interview-card .interview-card-message p { margin:7px 0 0; color:rgba(255,255,255,.88); font-size:8px; }
+.interview-card .interview-card-image { position:static; width:105px; max-height:145px; align-self:end; opacity:1; object-fit:contain; }
+.interview-dashboard-stats { display:grid; grid-template-columns:repeat(4,1fr); padding:13px 5px; background:rgba(91,0,4,.35); border:1px solid rgba(255,255,255,.08); border-radius:9px; }
+.interview-dashboard-stats>div { display:grid; grid-template-columns:auto auto; justify-content:center; align-items:center; column-gap:8px; padding:0 8px; text-align:center; }
+.interview-dashboard-stats>div+div { border-left:1px solid rgba(255,255,255,.15); }
+.interview-dashboard-stats svg { width:15px; color:#f1a4a7; }
+.interview-dashboard-stats strong { color:#fff; font-size:13px; }
+.interview-dashboard-stats span { grid-column:1/-1; margin-top:4px; color:rgba(255,255,255,.82); font-size:7px; }
+.interview-performance-summary { display:flex; align-items:center; justify-content:space-between; gap:14px; padding:15px; border:1px solid rgba(255,255,255,.18); border-radius:9px; }
+.interview-performance-summary strong,.interview-dashboard-tip strong { color:#fff; font-size:9px; }
+.interview-performance-summary p,.interview-dashboard-tip p { margin:6px 0 0; color:rgba(255,255,255,.86); font-size:7px; line-height:1.6; }
+.interview-performance-summary ul { display:grid; gap:5px; margin:8px 0 0; padding-left:15px; color:rgba(255,255,255,.9); font-size:7px; line-height:1.45; }
+.interview-performance-summary button { min-height:36px; display:inline-flex; align-items:center; gap:7px; flex:none; padding:0 13px; color:#a40b11; background:#fff; border:0; border-radius:7px; box-shadow:0 4px 11px rgba(50,0,3,.14); font-size:8px; font-weight:800; cursor:pointer; }
+.interview-performance-summary button svg { width:13px; }
+.interview-dashboard-tip { display:flex; align-items:center; gap:13px; padding:0 3px; }
+.interview-dashboard-tip>span { width:46px; height:46px; display:grid; place-items:center; flex:none; color:#fff; border:1px solid rgba(255,255,255,.25); border-radius:50%; }
+.interview-dashboard-tip>span svg { width:22px; }
+
+@media (max-width: 1150px) and (min-width: 851px) {
+  .interview-dashboard-main { grid-template-columns:100px 1fr; }
+  .interview-card .interview-card-image { display:none; }
+  .interview-dashboard-stats { grid-template-columns:repeat(2,1fr); row-gap:14px; }
+  .interview-dashboard-stats>div:nth-child(3) { border-left:0; }
+}
+
+@media (max-width: 560px) {
+  .interview-dashboard-main { grid-template-columns:95px 1fr; }
+  .interview-card .interview-card-image { display:none; }
+  .interview-dashboard-stats { grid-template-columns:repeat(2,1fr); row-gap:14px; }
+  .interview-dashboard-stats>div:nth-child(3) { border-left:0; }
+  .interview-performance-summary { align-items:flex-start; flex-direction:column; }
+}
+
+/* Readable Montserrat Medium type for dashboard analysis cards */
+.skill-card,.skill-card *,.interview-card,.interview-card * { font-family:"Montserrat",Arial,sans-serif; }
+.skill-card p,.skill-card span,.skill-card small,.skill-card a,
+.interview-card p,.interview-card span,.interview-card li { font-weight:500; }
+.skill-card .skill-list-item>div strong { font-size:11px; font-weight:600; }
+.skill-card .skill-list-item p { font-size:9px; line-height:1.5; }
+.skill-card .skill-status { font-size:9px; font-weight:600; }
+.skill-gap-counts small { font-size:9px; }
+.skill-recommendation strong { font-size:11px; font-weight:600; }
+.skill-recommendation p { font-size:9px; line-height:1.55; }
+.interview-dashboard-heading p { font-size:9px; }
+.interview-card .interview-card-message h3 { font-size:14px; font-weight:600; }
+.interview-card .interview-card-message p { font-size:9px; }
+.interview-dashboard-stats span { font-size:8px; }
+.interview-performance-summary strong,.interview-dashboard-tip strong { font-size:10px; font-weight:600; }
+.interview-performance-summary ul { font-size:9px; line-height:1.55; }
+.interview-dashboard-tip p { font-size:9px; line-height:1.55; }

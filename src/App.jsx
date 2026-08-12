@@ -1,6 +1,7 @@
 import "./App.css";
 
 import { Route, Switch } from "wouter";
+import { Analytics } from "@vercel/analytics/react";
 
 import Navbar from "./Components/Navbar";
 import Hero from "./Components/Hero";
@@ -141,6 +142,7 @@ function App() {
       {/* Page not found */}
       <Route component={NotFound} />
     </Switch>
+    <Analytics />
     </ProtectedRoute>
   );
 }

@@ -10,6 +10,7 @@ import {
 } from "lucide-react";
 
 import { useLocation } from "wouter";
+import logoWhite from "../../assets/logo-white.svg";
 
 const navigationItems = [
   {
@@ -87,7 +88,7 @@ function DashboardSidebar({
       }`}
     >
       <div className="dashboard-sidebar-brand">
-           <img src={'/src/assets/logo-white.svg'} alt="Dwuma Logo" height="40" />
+        <img src={logoWhite} alt="Dwuma Logo" height="40" />
       </div>
 
       <nav className="dashboard-sidebar-navigation">

@@ -1,5 +1,8 @@
 import { forwardRef, useEffect, useImperativeHandle, useRef, useState } from "react";
-import { LogLevel, SimliClient } from "simli-client";
+// The package's public index imports "./Client", but v3.0.2 publishes
+// the file as lowercase "client.js". Import the published file directly
+// so production builds work on Linux's case-sensitive filesystem.
+import { LogLevel, SimliClient } from "simli-client/dist/client.js";
 
 import { createSimliSession, generateInterviewerSpeech } from "../services/interviewService";
 

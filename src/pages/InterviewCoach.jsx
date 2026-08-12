@@ -482,7 +482,11 @@ async function startInterviewSession() {
     const recorder =
       new MediaRecorder(
         stream,
-        options
+        {
+          ...options,
+          videoBitsPerSecond: 1_200_000,
+          audioBitsPerSecond: 64_000,
+        }
       );
 
     sessionRecorderRef.current =
